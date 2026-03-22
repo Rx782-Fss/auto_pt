@@ -163,8 +163,8 @@ The project currently supports test email delivery and notifications for events 
 
 ## Image Tags
 
-- `latest`: latest released version
-- `1.2.0`: current pinned release version
+- `latest`: rolling tag that follows the newest release, suitable when you want ongoing updates
+- `1.2.0`: pinned current release tag, suitable for reproducible and stable deployments
 
 ## Local Run
 
