@@ -11,9 +11,17 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
-_TEST_LOG_DIR = tempfile.mkdtemp(prefix="auto_pt_test_logs_")
-os.environ["AUTO_PT_LOG_DIR"] = _TEST_LOG_DIR
-atexit.register(lambda: shutil.rmtree(_TEST_LOG_DIR, ignore_errors=True))
+_TEST_RUNTIME_DIR = Path(tempfile.mkdtemp(prefix="auto_pt_test_runtime_"))
+_TEST_LOG_DIR = _TEST_RUNTIME_DIR / "logs"
+_TEST_CONFIG_FILE = _TEST_RUNTIME_DIR / "config.yaml"
+_TEST_KEY_FILE = _TEST_RUNTIME_DIR / "auto_pt.key"
+_TEST_LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+os.environ["AUTO_PT_LOG_DIR"] = str(_TEST_LOG_DIR)
+os.environ["AUTO_PT_CONFIG_FILE"] = str(_TEST_CONFIG_FILE)
+os.environ["AUTO_PT_KEY_FILE"] = str(_TEST_KEY_FILE)
+
+atexit.register(lambda: shutil.rmtree(_TEST_RUNTIME_DIR, ignore_errors=True))
 
 import web
 import src.crypto_config as crypto_config
@@ -304,7 +312,9 @@ class ConfigApiRegressionTests(unittest.TestCase):
     def test_session_token_persists_after_restart_reload(self):
         with tempfile.TemporaryDirectory(prefix="auto_pt_auth_tokens_") as temp_dir:
             token_file = Path(temp_dir) / "session_tokens.json"
-            with patch.object(web, "_SESSION_TOKENS_FILE", token_file):
+            with patch.object(web, "_SESSION_TOKENS_FILE", token_file), patch.object(
+                web, "load_config", return_value=self._base_config()
+            ):
                 with web._session_tokens_lock:
                     web._session_tokens.clear()
 
