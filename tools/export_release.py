@@ -22,8 +22,6 @@ TOP_LEVEL_FILES = [
     "web.py",
     "start.bat",
     "start.sh",
-    "check.bat",
-    "check.sh",
 ]
 
 TOP_LEVEL_DIRS = [

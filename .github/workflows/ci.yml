@@ -5,9 +5,13 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   check:
@@ -22,16 +26,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "20"
 
@@ -40,16 +44,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run checks on Linux
-        if: runner.os != 'Windows'
+      - name: Show tool versions
         run: |
-          chmod +x check.sh
-          ./check.sh
+          python --version
+          node --version
 
-      - name: Run checks on Windows
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: check.bat
+      - name: Python syntax check
+        run: python tools/run_checks.py --section python
+
+      - name: Frontend syntax check
+        run: python tools/run_checks.py --section frontend
+
+      - name: Regression tests
+        run: python tools/run_checks.py --section tests
 
       - name: Verify release export script
         if: runner.os == 'Linux'
