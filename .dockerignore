@@ -1,0 +1,56 @@
+# VCS and local-only files
+.git/
+.github/
+.gitignore
+.gitattributes
+AGENTS.md
+
+# Local secrets and runtime state
+config*.yaml
+!config.yaml.example
+config/
+auto_pt.key
+.env
+.env.*
+*.key
+logs/
+data/
+runtime/
+tmp/
+artifacts/
+backups/
+session_tokens.json
+
+# Python cache / environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+.venv/
+venv/
+env/
+ENV/
+
+# Editor / OS / temp
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+*.bak
+*.tmp
+*.temp
+nul
+
+# Files not needed in image build context
+tests/
+docs/
+README.md
+README.en.md
+LICENSE
+check.bat
+check.sh
+start.bat

@@ -1,0 +1,44 @@
+# PT Auto Downloader 配置文件示例
+# 首次运行会自动生成 config.yaml，请按需填写真实站点与下载器信息
+
+# ==================== 应用设置 ====================
+app:
+  # 访问控制模式：lan(仅本机和局域网), whitelist(仅白名单 IP), public(局域网和公网都允许)
+  access_control: lan
+  # 允许访问的 IP 列表（当 access_control 为 whitelist 时使用）
+  allowed_ips: []
+  # Web 界面密钥（用于 session 加密，请修改为随机字符串）
+  secret: YOUR_SECRET_KEY_HERE_CHANGE_ME
+  # 版本号（自动生成，无需修改）
+  version: 1.2.0
+  # Web 界面端口
+  web_port: 5000
+
+# ==================== 日志级别 ====================
+# 顶层 log_level 主要供页面显示；真正生效的是下面的 logging.level
+log_level: WARNING
+logging:
+  level: INFO
+  suppress_request_logs: true
+  request_log_level: WARNING
+
+# ==================== PT 站点配置 ====================
+pt_sites: []
+
+# ==================== qBittorrent 配置 ====================
+qbittorrent:
+  # qBittorrent Web UI 地址（按实际环境填写）
+  url: ""
+  # 用户名
+  username: ""
+  # 密码
+  password: ""
+  # 默认保存路径
+  save_path: ""
+  # 默认分类（可选）
+  category: ""
+
+# ==================== 全局调度设置 ====================
+schedule:
+  # 主检查间隔（秒）
+  interval: 600

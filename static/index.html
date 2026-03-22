@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 禁止缓存，确保总是加载最新版本 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Auto PT Downloader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- CSS -->
+    <link rel="icon" href="/favicon.svg?v=1" type="image/svg+xml">
+    <link rel="shortcut icon" href="/favicon.svg?v=1" type="image/svg+xml">
+    <link rel="stylesheet" href="css/main.css?v=173">
+    <link rel="stylesheet" href="css/components.css?v=173">
+    <link rel="stylesheet" href="css/utilities.css?v=180">
+    <link rel="stylesheet" href="css/site-panel.css?v=4">
+    <link rel="stylesheet" href="css/ui-unify.css?v=48">
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon"><i data-lucide="zap" class="icon-xl"></i></div>
+            <div class="logo-text">
+                <h1>Auto PT Downloader</h1>
+                <span>Auto PT Fetcher <span class="version-tag">v<span id="appVersion">...</span></span></span>
+            </div>
+            </div>
+            <div class="status-bar">
+                <!-- 认证状态指示 -->
+                <div class="status-item is-hidden" id="authStatusItem">
+                    <div class="status-dot status-dot-warning" id="authStatusDot"></div>
+                    <span id="authStatusText">未设置密钥</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot" id="qbStatus"></div>
+                    <span id="qbStatusText">qBittorrent</span>
+                </div>
+                <div class="status-item">
+                    <div class="status-dot active" id="serviceStatus"></div>
+                    <span>服务运行中</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- 统计信息 -->
+            <div class="card full-width stats-card-wrapper">
+                <div class="stats-action-rail">
+                    <!-- 站点管理书签按钮 -->
+                    <div class="qb-bookmark-btn qb-btn-sites" data-panel-key="sites" onclick="toggleSitePanel()" title="PT 站点管理">
+                        <span class="qb-bookmark-icon"><i data-lucide="globe-2" class="icon-md"></i></span>
+                        <span class="qb-bookmark-copy">
+                            <span class="qb-bookmark-name">PT 站点</span>
+                            <span class="qb-bookmark-setting">运行管理</span>
+                        </span>
+                    </div>
+
+                    <!-- QB 配置书签按钮 -->
+                    <div class="qb-bookmark-btn qb-btn-qb" data-panel-key="qb" onclick="toggleQBPanel()" title="qBittorrent 配置">
+                        <span class="qb-bookmark-icon"><i data-lucide="link-2" class="icon-md"></i></span>
+                        <span class="qb-bookmark-copy">
+                            <span class="qb-bookmark-name">qBittorrent</span>
+                            <span class="qb-bookmark-setting">连接配置</span>
+                        </span>
+                    </div>
+
+                    <!-- 邮件通知书签按钮 -->
+                    <div class="qb-bookmark-btn qb-btn-notify" data-panel-key="notify" onclick="toggleNotificationPanel()" title="邮件通知配置">
+                        <span class="qb-bookmark-icon"><i data-lucide="mail" class="icon-md"></i></span>
+                        <span class="qb-bookmark-copy">
+                            <span class="qb-bookmark-name">邮件通知</span>
+                            <span class="qb-bookmark-setting">发件 / 收件</span>
+                        </span>
+                    </div>
+                    
+                    <!-- 系统设置书签按钮 -->
+                    <div class="qb-bookmark-btn qb-btn-system" id="systemSettingsBtn" data-panel-key="system" onclick="toggleSystemPanel()" title="系统设置">
+                        <span class="qb-bookmark-icon"><i data-lucide="settings-2" class="icon-md"></i></span>
+                        <span class="qb-bookmark-copy">
+                            <span class="qb-bookmark-name">系统设置</span>
+                            <span class="qb-bookmark-setting">安全与访问</span>
+                        </span>
+                        <span class="qb-bookmark-badge is-hidden" id="authBadge">!</span>
+                    </div>
+                </div>
+                
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-icon"><i data-lucide="bar-chart-2"></i></div>
+                        统计信息
+                    </div>
+                    <div class="stats-card-actions">
+                        <button class="btn btn-secondary toolbar-btn" onclick="viewHistory()"><i data-lucide="history" class="icon-sm"></i> 历史管理</button>
+                        <button class="btn btn-secondary toolbar-btn" onclick="refreshStats()"><i data-lucide="refresh-cw" class="icon-sm"></i> 刷新</button>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="todayCount">-</div>
+                        <div class="stat-label">今日完成</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="weekCount">-</div>
+                        <div class="stat-label">累计完成</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="totalHistory">-</div>
+                        <div class="stat-label">做种中</div>
+                    </div>
+                </div>
+                <div class="stats-grid stats-grid-secondary">
+                    <div class="stat-item">
+                        <div class="stat-value" id="qbDownloading">-</div>
+                        <div class="stat-label stat-tone-info">当前下载</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="qbPaused">-</div>
+                        <div class="stat-label stat-tone-warning">当前暂停</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="qbSeeding">-</div>
+                        <div class="stat-label">已删除</div>
+                    </div>
+                </div>
+                <div class="site-schedule-section">
+                    <div class="site-schedule-header">
+                        <div class="site-schedule-title">站点信息</div>
+                        <div class="site-schedule-summary" id="siteScheduleSummary">正在加载...</div>
+                    </div>
+                    <div class="site-schedule-list" id="siteScheduleList">
+                        <div class="site-schedule-empty">正在加载站点信息...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 运行日志 -->
+            <div class="card full-width">
+                <div class="card-header">
+                    <div class="card-title">
+                        <div class="card-icon"><i data-lucide="file-text"></i></div>
+                        运行日志
+                        <span id="logEntryCount" class="log-entry-count"></span>
+                        <span id="logAutoRefreshIndicator" class="log-refresh-indicator is-hidden">
+                            <span class="log-refresh-dot"></span>
+                            自动刷新
+                        </span>
+                    </div>
+                    <div class="log-toolbar">
+                        <select id="logLevelFilter" class="toolbar-select" onchange="applyLogFiltersUI()">
+                            <option value="all">全部级别</option>
+                        </select>
+                        <select id="logModuleFilter" class="toolbar-select" onchange="applyLogFiltersUI()">
+                            <option value="all">全部模块</option>
+                        </select>
+                        <input type="text" id="logKeywordFilter" class="toolbar-search-input log-search-input" placeholder="搜索关键词..."
+                               oninput="applyLogFiltersUI()" />
+                        <label class="checkbox-inline">
+                            <input type="checkbox" id="logAutoRefresh" class="checkbox-inline-input" onchange="toggleLogAutoRefresh()" checked>
+                            <span class="checkbox-inline-label">自动刷新</span>
+                        </label>
+                        <div class="log-actions">
+                            <button class="btn btn-log" onclick="copyLogs()" title="复制日志"><i data-lucide="copy" class="icon-md"></i></button>
+                            <button class="btn btn-log" onclick="clearLogs()" title="清除日志"><i data-lucide="trash-2" class="icon-md"></i></button>
+                            <button class="btn btn-log" onclick="refreshLogs()" title="刷新日志"><i data-lucide="refresh-cw" class="icon-md"></i></button>
+                        </div>
+                    </div>
+                </div>
+                <div class="log-container" id="logContainer">
+                    <div class="log-empty">
+                        <div class="log-empty-icon"><i data-lucide="file-text" class="icon-2xl"></i></div>
+                        <div>等待加载...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="modal" id="previewModal">
+        <div class="modal-content modal-xl">
+            <div class="modal-header">
+                <h3><i data-lucide="eye" class="icon-lg"></i> 种子预览</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-body-flush">
+                <div id="torrentPreviewList">
+                    <!-- 工具栏、操作栏、列表区、分页栏（动态添加） -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary is-hidden" id="downloadBtn" onclick="downloadSelectedTorrents()"><i data-lucide="download" class="icon-sm"></i> 下载选中 <span id="btnSelectedCount" class="inline-count-gap"></span></button>
+                <button class="btn btn-secondary" onclick="closeModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+ 
+    <!-- 综合过滤弹窗 -->
+    <div class="modal" id="filterModal">
+        <div class="modal-content modal-xl modal-scroll-shell">
+            <div class="modal-header">
+                <h3><i data-lucide="search" class="icon-lg"></i> 过滤规则设置 - <span id="filterModalSiteName"></span></h3>
+                <button class="modal-close" onclick="closeFilterModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-form-shell">
+<div class="form-group">
+                      <label>匹配关键词</label>
+                      <p class="field-help">逗号或换行分隔多个关键词。逗号 = 或条件，空格 = 且条件。示例：国语，粤语，eng</p>
+                      <textarea id="filterKeywords" class="auto-width modal-textarea modal-textarea-dynamic" oninput="autoResizeTextareaWidth(this)" placeholder="国语，粤语，eng"></textarea>
+                  </div>
+                <div class="form-group">
+                    <label>排除关键词</label>
+                    <p class="field-help">逗号或换行分隔多个关键词。包含任意一个即排除。示例：REMUX，国语，chd</p>
+                    <textarea id="filterExclude" class="auto-width modal-textarea modal-textarea-dynamic" oninput="autoResizeTextareaWidth(this)" placeholder="REMUX，国语，chd"></textarea>
+                </div>
+                <div class="input-row">
+                <div class="form-group">
+                    <label>最小 (GB)</label>
+                    <input type="number" id="filterMinSize" class="field-input-full" step="0.1" placeholder="0">
+                </div>
+                    <div class="form-group">
+                        <label>最大 (GB)</label>
+                        <input type="number" id="filterMaxSize" class="field-input-full" step="0.1" placeholder="0">
+                    </div>
+                </div>
+                <p class="field-note">大小设置为 0 表示不限制，配置仅对当前站点生效。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeFilterModal()">取消</button>
+                <button class="btn btn-primary" id="filterModalSaveBtn" onclick="saveFilterRules()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 站点配置弹窗 -->
+    <div class="modal" id="configModal">
+        <div class="modal-content modal-lg modal-scroll-shell">
+            <div class="modal-header">
+                <h3><i data-lucide="settings" class="icon-lg"></i> 运行配置 - <span id="configModalSiteName"></span></h3>
+                <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <div class="form-group">
+                    <label>自动刷新种子间隔（秒）</label>
+                    <input type="number" id="configInterval" class="field-input-full" placeholder="3600" min="300" value="3600">
+                    <p class="field-help field-help-spaced">建议设置为 1800 秒（30 分钟）或更长。太短可能被站点限流（429 错误），导致获取失败。</p>
+                </div>
+                <div class="form-group">
+                    <label>清除已下载种子间隔（秒）</label>
+                    <input type="number" id="configCleanupInterval" class="field-input-full" placeholder="留空或 0 则使用自动刷新间隔" min="0" value="">
+                    <p class="field-help field-help-spaced">设置 0 或留空则使用自动刷新间隔，大于 0 则使用自定义时间。建议设置为大于 3 分钟（180 秒）或更长。</p>
+                </div>
+                
+                <label class="checkbox-group">
+                    <input type="checkbox" id="configPauseAdded">
+                    <span>添加后暂停</span>
+                </label>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="configAutoDelete">
+                    <span>下载完成后自动删除任务</span>
+                </label>
+                <label class="checkbox-group">
+                    <input type="checkbox" id="configDeleteFiles">
+                    <span>删除任务时同时删除文件</span>
+                </label>
+                
+                <div class="settings-emphasis-block">
+                    <label class="checkbox-group">
+                        <input type="checkbox" id="configAutoDownload">
+                        <span class="accent-inline"><i data-lucide="rocket" class="icon-sm"></i> 新种子自动下载</span>
+                    </label>
+                    <p class="field-note field-note-indent">开启后检测到新种子将自动开始下载，关闭后需手动确认下载</p>
+                </div>
+                
+                <p class="field-note">配置仅对当前站点生效。</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfigModal()">取消</button>
+                <button class="btn btn-primary" id="configModalSaveBtn" onclick="saveConfigFromModal()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认对话框 -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content modal-sm">
+            <div class="modal-header">
+                <h3 id="confirmModalTitle">确认操作</h3>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <div id="confirmModalMessage" class="confirm-message"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="confirmModalCancelBtn" onclick="closeConfirmModal()">取消</button>
+                <button class="btn btn-primary" id="confirmModalConfirmBtn" onclick="confirmModalAction()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- API 认证弹窗 -->
+    <div class="modal" id="authTokenModal">
+        <div class="modal-content centered modal-sm">
+            <div class="modal-header">
+                <h3><i data-lucide="key" class="icon-lg icon-accent"></i> 输入 API 密钥</h3>
+                <button class="modal-close" id="authTokenCloseBtn" onclick="closeAuthTokenModal()" type="button">&times;</button>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <p class="modal-intro">
+                    当前操作需要 API 认证。请输入有效的 API 认证密钥后继续，输入成功后会自动保存在当前浏览器。
+                </p>
+                <div class="form-group">
+                    <label for="authTokenInput">API 认证密钥</label>
+                    <input
+                        type="password"
+                        id="authTokenInput"
+                        class="field-input-full auth-token-input"
+                        placeholder="请输入当前有效的 API 密钥"
+                        autocomplete="current-password">
+                    <p id="authTokenError" class="field-help field-help-tight auth-token-error is-hidden"></p>
+                </div>
+                <p class="field-note">
+                    如果你刚修改过密钥，请输入新的密钥；输入后当前请求会自动继续，不需要重新点一次按钮。
+                </p>
+                <div class="auth-token-actions">
+                    <button class="detail-card auth-recovery-card" type="button" onclick="openRecoveryModal()">
+                        <div class="detail-card-header">
+                            <i data-lucide="key-round" class="detail-card-icon"></i>
+                        <span class="detail-card-title">忘记密钥，使用恢复码重置</span>
+                        </div>
+                        <p class="auth-recovery-card-desc">输入你保存的一次性恢复码，重新生成新的 API 认证密钥。</p>
+                    </button>
+                    <button class="detail-card auth-recovery-card auth-recovery-card-email" type="button" onclick="openNotificationBackupPanel()">
+                        <div class="detail-card-header">
+                            <i data-lucide="mail" class="detail-card-icon"></i>
+                        <span class="detail-card-title">忘记密钥，使用邮箱恢复</span>
+                        </div>
+                        <p class="auth-recovery-card-desc">已配置邮箱时会直接发送恢复信息；未配置时会提示改用恢复码恢复。</p>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer modal-footer-equal">
+                <button class="btn btn-secondary" id="authTokenCancelBtn" onclick="closeAuthTokenModal()" type="button">取消</button>
+                <button class="btn btn-primary" id="authTokenSubmitBtn" onclick="submitAuthTokenModal()">
+                    <i data-lucide="key" class="icon-sm"></i> 继续
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 恢复码提示弹窗 -->
+    <div class="modal" id="recoveryCodeModal">
+        <div class="modal-content centered modal-sm modal-scroll-shell recovery-code-modal">
+            <div class="modal-header">
+                <h3 id="recoveryCodeTitle" class="recovery-code-title"><i data-lucide="shield-check" class="icon-lg icon-warning"></i> 重要：恢复码已生成</h3>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <p class="modal-intro" id="recoveryCodeIntro"><strong class="recovery-intro-lead">重要：首次保存后会生成一次性恢复码，只显示一次。</strong><span class="recovery-intro-tail">请至少完成一项：配置邮箱通知备份，或者离线保存并牢记恢复码。</span></p>
+                <div class="form-group is-hidden" id="recoverySecretGroup">
+                    <label for="recoverySecretValue">新的 API 认证密钥</label>
+                    <div class="panel-inline-row">
+                        <input type="text" id="recoverySecretValue" class="field-input-full recovery-secret-field" readonly spellcheck="false" autocomplete="off">
+                        <button class="btn btn-secondary btn-nowrap" id="recoverySecretCopyBtn" type="button" onclick="copyRecoverySecret()">
+                            <i data-lucide="copy" class="icon-sm"></i> 复制
+                        </button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="recoveryCodeValue">一次性恢复码</label>
+                    <div class="panel-inline-row">
+                        <input type="text" id="recoveryCodeValue" class="field-input-full recovery-code-field" readonly spellcheck="false" autocomplete="off">
+                        <button class="btn btn-secondary btn-nowrap" id="recoveryCodeCopyBtn" type="button" onclick="copyRecoveryCode()">
+                            <i data-lucide="copy" class="icon-sm"></i> 复制
+                        </button>
+                    </div>
+                </div>
+                <p class="field-note" id="recoveryCodeHint">恢复码只用于忘记 API 密钥时重置访问权限。没有邮箱备份时，请务必离线保存这段代码。</p>
+                <div id="recoveryModalError" class="panel-status-text status-error is-hidden" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer modal-footer-equal">
+                <button class="btn btn-secondary" id="recoveryCodeConfirmBtn" type="button" onclick="confirmRecoveryCodeSaved()">我已保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 恢复码重置弹窗 -->
+    <div class="modal" id="recoveryResetModal">
+        <div class="modal-content centered modal-sm modal-scroll-shell">
+            <div class="modal-header">
+                <h3><i data-lucide="key-round" class="icon-lg icon-warning"></i> 使用恢复码重置密钥</h3>
+                <button class="modal-close" onclick="closeRecoveryResetModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <p class="modal-intro">请输入你之前保存的恢复码，然后设置一个新的 API 认证密钥。也可以直接随机生成一个新密钥。</p>
+                <div class="form-group">
+                    <label for="recoveryCodeInput">恢复码</label>
+                    <input type="text" id="recoveryCodeInput" placeholder="XXXX-XXXX-XXXX-XXXX">
+                </div>
+                <div class="form-group">
+                    <label for="recoveryNewSecretInput">新的 API 密钥</label>
+                    <div class="panel-inline-row">
+                        <input type="password" id="recoveryNewSecretInput" class="panel-grow" placeholder="输入新的 API 密钥" autocomplete="new-password">
+                        <button class="btn btn-secondary btn-nowrap" type="button" onclick="generateRandomSecret('recoveryNewSecretInput')" title="随机生成新的 API 密钥">
+                            <i data-lucide="refresh-cw" class="icon-sm"></i> 随机生成
+                        </button>
+                    </div>
+                </div>
+                <div id="recoveryResetError" class="panel-status-text status-error is-hidden" aria-live="polite"></div>
+            </div>
+            <div class="modal-footer modal-footer-equal">
+                <button class="btn btn-secondary" type="button" onclick="closeRecoveryResetModal()">取消</button>
+                <button class="btn btn-primary" id="recoveryResetBtn" type="button" onclick="submitRecoveryModal()">
+                    <i data-lucide="shield-check" class="icon-sm"></i> 重置密钥
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 历史记录模态框 -->
+    <div class="modal" id="historyModal">
+        <div class="modal-content modal-xl">
+            <div class="modal-header">
+                <h3><i data-lucide="history" class="icon-lg"></i> 历史记录管理</h3>
+                <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-body-flush">
+<!-- 工具栏 -->
+<div class="history-toolbar history-toolbar-compact">
+    <input type="text" id="historySearch" placeholder="搜索标题 / 站点 / 类型" 
+           class="toolbar-search-input toolbar-search-input-wide record-toolbar-search"
+           oninput="searchHistoryDynamic(this.value)"/>
+    <select id="historySiteFilter" class="toolbar-select record-toolbar-select record-toolbar-select-site" onchange="filterHistory()" title="按站点过滤">
+        <option value="">站点</option>
+    </select>
+    <select id="historyCategoryFilter" class="toolbar-select record-toolbar-select record-toolbar-select-category" onchange="filterHistory()" title="按种子类型过滤">
+        <option value="">类型</option>
+    </select>
+    <select id="historySort" class="toolbar-select record-toolbar-select record-toolbar-select-sort" onchange="filterHistory()" title="排序方式">
+        <option value="default">排序</option>
+        <option value="time_desc">最新</option>
+        <option value="time_asc">最早</option>
+        <option value="size_desc">最大</option>
+        <option value="size_asc">最小</option>
+    </select>
+    <select id="historyDays" class="toolbar-select record-toolbar-select record-toolbar-select-days" onchange="filterHistory()" title="按时间范围过滤">
+        <option value="0">时间</option>
+        <option value="7">7 天</option>
+        <option value="30">30 天</option>
+        <option value="90">90 天</option>
+    </select>
+    <select id="historyPageSize" class="toolbar-select record-toolbar-select record-toolbar-select-page" onchange="changePageSize()" title="每页条数">
+        <option value="10">10/页</option>
+        <option value="20" selected>20/页</option>
+        <option value="50">50/页</option>
+        <option value="100">100/页</option>
+    </select>
+</div>
+                
+                <!-- 操作栏 -->
+<div class="history-batch-bar">
+                    <div class="toolbar-inline-group">
+                        <label class="toolbar-check-label">
+                            <input type="checkbox" id="selectAllCheckbox" class="toolbar-check-input" onchange="toggleAll(this)">
+                            全选
+                        </label>
+                        <button class="btn btn-secondary btn-compact" onclick="invertSelection()">反选</button>
+                        <button class="btn btn-secondary btn-compact" onclick="hideSelected()">
+                            <i data-lucide="eye-off" class="icon-sm"></i> 从列表隐藏
+                        </button>
+                        <button class="btn btn-secondary btn-compact" id="historyHiddenToggleBtn" onclick="toggleHistoryHiddenView()">
+                            <i data-lucide="eye-off" class="icon-sm"></i> 查看已隐藏
+                        </button>
+                        <button class="btn btn-accent btn-compact" id="historyRestoreBtn" onclick="restoreAllHidden()" style="display: none;">
+                            <i data-lucide="eye" class="icon-sm"></i> 恢复到列表
+                        </button>
+                        <button class="btn btn-danger btn-compact" onclick="deleteSelected()"><i data-lucide="trash-2" class="icon-sm"></i> 彻底删除</button>
+                    </div>
+                    <div class="toolbar-meta">
+                        共 <span id="historyTotal">0</span> 条 | 已选 <span id="selectedCount">0</span> 条
+                    </div>
+                </div>
+                
+                <!-- 列表区 -->
+                <div id="historyList" class="torrent-list history-list-shell">
+                    <div class="loading-text">加载中...</div>
+                </div>
+                
+                <!-- 分页栏 -->
+<div class="history-pagination-bar">
+                    <div class="toolbar-meta">
+                        第 <span id="currentPage">1</span> / <span id="totalPages">1</span> 页
+                    </div>
+<div class="toolbar-actions-compact">
+                        <button class="btn btn-secondary btn-compact" onclick="goToPage(1)" id="firstPageBtn" disabled><i data-lucide="chevrons-left" class="icon-sm"></i></button>
+                        <button class="btn btn-secondary btn-compact" onclick="prevPage()" id="prevPageBtn" disabled><i data-lucide="chevron-left" class="icon-sm"></i> 上一页</button>
+                        <button class="btn btn-secondary btn-compact" onclick="nextPage()" id="nextPageBtn" disabled>下一页 <i data-lucide="chevron-right" class="icon-sm"></i></button>
+                        <button class="btn btn-secondary btn-compact" onclick="goToLastPage()" id="lastPageBtn" disabled><i data-lucide="chevrons-right" class="icon-sm"></i></button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeHistoryModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 站点编辑模态框 -->
+    <div class="modal" id="siteModal">
+        <div class="modal-content modal-lg">
+            <div class="modal-header">
+                <h3 id="siteModalTitle">添加站点</h3>
+                <button class="modal-close" onclick="closeSiteModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <input type="hidden" id="siteOriginalName">
+                <input type="hidden" id="siteOriginalRss">
+                <div class="form-group">
+                    <label>站点名称 *</label>
+                    <input type="text" id="siteName" placeholder="如：mteam, hdsky, ourbits" required>
+                    <p class="field-help field-help-tight">站点唯一标识，只能包含字母、数字和下划线。</p>
+                </div>
+                <div class="form-group">
+                    <label>RSS 订阅链接 *</label>
+                    <input type="text" id="siteRssUrl" placeholder="https://example.com/rss.php?passkey=xxx&dl=1">
+                    <p class="field-help field-help-tight">需包含 passkey 参数，建议添加 &amp;dl=1 获取下载链接。</p>
+                </div>
+                <div class="input-row">
+                    <div class="form-group">
+                        <label>Base URL（可选）</label>
+                        <input type="text" id="siteBaseUrl" placeholder="https://example.com">
+                        <p class="field-help field-help-tight">站点主页地址，留空将自动从 RSS 链接提取。</p>
+                    </div>
+                    <div class="form-group">
+                        <label>QB 标签（可选）</label>
+                        <input type="text" id="siteTags" placeholder="auto_pt, mteam">
+                        <p class="field-help field-help-tight">逗号分隔多个标签，留空默认为：站点名，auto_pt。</p>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="form-group">
+                        <label>Passkey（可选）</label>
+                        <input type="text" id="sitePasskey" placeholder="用户 Passkey">
+                        <p class="field-help field-help-tight">用于下载种子时附加验证。</p>
+                    </div>
+                    <div class="form-group">
+                        <label>UID（可选）</label>
+                        <input type="text" id="siteUid" placeholder="用户 ID">
+                        <p class="field-help field-help-tight">部分站点需要。</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer modal-footer-split">
+                <button class="btn btn-danger is-hidden" id="deleteSiteBtn" onclick="deleteCurrentSite()"><i data-lucide="trash-2" class="icon-sm"></i> 删除</button>
+                <div class="modal-actions-right">
+                    <button class="btn btn-secondary" onclick="closeSiteModal()">取消</button>
+                    <button class="btn btn-primary" id="siteModalSaveBtn" onclick="saveSite()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QB 配置滑出面板 -->
+    <div class="qb-slide-panel" id="qbSlidePanel">
+        <div class="qb-panel-header">
+            <h3><i data-lucide="link" class="icon-lg"></i> qBittorrent <span id="qbVersion" class="panel-inline-meta"></span></h3>
+            <button class="qb-panel-close" onclick="toggleQBPanel()">×</button>
+        </div>
+        <div class="qb-panel-body">
+            <div class="form-group">
+                <label>WebUI 地址</label>
+                <input type="text" id="qbHost" placeholder="http://127.0.0.1:8585">
+            </div>
+            <div class="input-row">
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input type="text" id="qbUsername" placeholder="admin">
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input type="password" id="qbPassword" placeholder="请输入密码">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>下载路径（留空=默认）</label>
+                <input type="text" id="savePath" placeholder="/downloads">
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-accent" onclick="handleTestQBConnection()">
+                    <i data-lucide="plug" class="icon-sm"></i> 测试连接
+                </button>
+                <button class="btn btn-primary" onclick="saveQBConfig()">
+                    <i data-lucide="save" class="icon-sm"></i> 保存配置
+                </button>
+            </div>
+            <span id="saveQBStatus" class="panel-status-text"></span>
+        </div>
+    </div>
+
+    <!-- 站点管理滑出面板 -->
+    <div class="qb-slide-panel qb-slide-panel-wide" id="siteSlidePanel">
+        <div class="qb-panel-header">
+            <div class="site-panel-title-group">
+                <h3><i data-lucide="globe" class="icon-lg"></i> PT 站点管理</h3>
+                <div class="site-panel-summary" id="sitePanelSummary">正在加载站点摘要...</div>
+            </div>
+            <div class="panel-header-actions">
+                <button class="btn btn-primary site-panel-add-btn" onclick="showAddSiteModal()">
+                    <i data-lucide="plus" class="icon-sm"></i> 添加站点
+                </button>
+                <button class="qb-panel-close" onclick="toggleSitePanel()">×</button>
+            </div>
+        </div>
+        <div class="qb-panel-body panel-form-shell">
+            <div class="site-panel-toolbar">
+                <div class="site-panel-copy">
+                    <strong>统一管理入口</strong>
+                    <span>启用、自动下载、过滤、运行配置和预览下载都集中在这里，方便按站点逐个调整。</span>
+                </div>
+                <div class="site-filter-bar">
+                    <div class="site-filter-search">
+                        <i data-lucide="search" class="icon-md site-filter-search-icon" aria-hidden="true"></i>
+                        <input type="text" id="siteSearchInput" placeholder="搜索站点名称" oninput="handleSiteSearch(this.value)">
+                    </div>
+                    <div class="site-filter-controls">
+                        <select id="siteFilterSelect" class="site-filter-select" onchange="handleSiteFilterChange(this.value)">
+                            <option value="all">全部站点</option>
+                            <option value="enabled">仅看启用</option>
+                            <option value="paused">仅看暂停</option>
+                            <option value="auto_download_on">自动下载开启</option>
+                            <option value="auto_download_off">自动下载关闭</option>
+                        </select>
+                        <select id="siteSortSelect" class="site-filter-select" onchange="handleSiteSortChange(this.value)">
+                            <option value="default">默认顺序</option>
+                            <option value="name_asc">名称 A-Z</option>
+                            <option value="enabled_first">已启用优先</option>
+                            <option value="auto_download_first">自动下载优先</option>
+                            <option value="recent_first">最近操作优先</option>
+                        </select>
+                        <button class="btn btn-secondary site-filter-reset" onclick="resetSiteFilters()">
+                            <i data-lucide="rotate-ccw" class="icon-sm"></i> 重置
+                        </button>
+                    </div>
+                </div>
+                <div class="site-batch-bar">
+                    <div class="site-batch-status" id="siteBatchStatus">未选择站点</div>
+                    <div class="site-batch-actions">
+                        <button class="btn btn-secondary site-batch-btn" id="siteBatchSelectPageBtn" onclick="selectCurrentPageSites()">全选本页</button>
+                        <button class="btn btn-secondary site-batch-btn" id="siteBatchClearBtn" onclick="clearSelectedSites()">清空选择</button>
+                        <button class="btn btn-secondary site-batch-btn" id="siteBatchEnableBtn" onclick="batchEnableSites()">批量启用</button>
+                        <button class="btn btn-secondary site-batch-btn" id="siteBatchDisableBtn" onclick="batchDisableSites()">批量暂停</button>
+                        <button class="btn btn-secondary site-batch-btn" id="siteBatchAutoOnBtn" onclick="batchEnableAutoDownload()">下载开启</button>
+                        <button class="btn btn-secondary site-batch-btn" id="siteBatchAutoOffBtn" onclick="batchDisableAutoDownload()">下载关闭</button>
+                    </div>
+                </div>
+                <div class="site-result-meta" id="siteResultMeta">正在加载站点列表...</div>
+            </div>
+            <div id="sitesContainer" class="sites-panel-container">
+                <div class="site-panel-empty">
+                    <div class="site-panel-empty-icon"><i data-lucide="globe" class="icon-xl"></i></div>
+                    <div class="site-panel-empty-title">加载中...</div>
+                    <div class="site-panel-empty-hint">正在准备站点面板内容</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系统设置滑出面板 -->
+    <div class="qb-slide-panel" id="systemSlidePanel">
+        <div class="qb-panel-header">
+            <h3><i data-lucide="settings" class="icon-lg"></i> 系统设置</h3>
+            <button class="qb-panel-close" onclick="toggleSystemPanel()">×</button>
+        </div>
+        <div class="qb-panel-body panel-form-shell">
+            <div class="form-group">
+                <label>API 认证密钥 (app.secret)</label>
+                <div class="panel-inline-row">
+                    <input type="password" id="systemAppSecret" class="panel-grow" placeholder="留空不修改，输入新密钥后保存" autocomplete="new-password">
+                    <button class="btn btn-secondary btn-nowrap" onclick="generateRandomSecret()" title="生成随机密钥">
+                        <i data-lucide="refresh-cw" class="icon-sm"></i> 随机生成
+                    </button>
+                </div>
+                <p class="field-help field-help-tight">用于保护 API 接口，防止未授权访问。首次设置后会生成一次性恢复码，请立即离线保存。</p>
+            </div>
+            <div class="settings-emphasis-block">
+                <label class="checkbox-group">
+                    <div class="toggle-switch toggle-switch-small">
+                        <input type="checkbox" id="systemDebugLogging" onchange="handleSystemLogLevelChange()">
+                        <span class="toggle-slider"></span>
+                    </div>
+                    <span>开启调试日志（DEBUG）</span>
+                    <span class="panel-inline-meta system-log-level-badge" id="systemLogLevelBadge">INFO</span>
+                </label>
+                <p class="field-help field-help-tight">关闭时只显示常规信息；开启后会显示更多内部调试日志，适合排查问题。</p>
+            </div>
+            <hr>
+            <div class="form-group">
+                <label>Web 服务端口</label>
+                <div class="panel-inline-row panel-inline-row-start">
+                    <input type="number" id="webPort" class="port-field" placeholder="5000" min="1" max="65535">
+                    <button class="btn btn-primary" onclick="saveWebPort()">
+                        <i data-lucide="save" class="icon-sm"></i> 保存
+                    </button>
+                </div>
+                <p class="field-help field-help-tight">
+                    修改端口后需要重启服务才能生效。当前端口：<span id="currentPort">5000</span>
+                </p>
+            </div>
+            <hr>
+            <div class="form-group">
+                <label>访问控制模式</label>
+                <div class="access-mode-stack">
+                    <label class="access-mode-option">
+                        <div class="toggle-switch toggle-switch-small">
+                            <input type="radio" name="accessMode" value="lan" checked onchange="handleAccessModeChange()">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span>仅局域网访问</span>
+                    </label>
+                    <label class="access-mode-option">
+                        <div class="toggle-switch toggle-switch-small">
+                            <input type="radio" name="accessMode" value="whitelist" onchange="handleAccessModeChange()">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span>IP 白名单</span>
+                    </label>
+                    <div id="whitelistConfig" class="access-mode-whitelist">
+                        <button class="btn btn-secondary" onclick="showWhitelistModal()">
+                            <i data-lucide="list" class="icon-sm"></i> 管理白名单 IP
+                        </button>
+                        <span id="whitelistCount" class="inline-meta-count"></span>
+                    </div>
+                    <label class="access-mode-option">
+                        <div class="toggle-switch toggle-switch-small">
+                            <input type="radio" name="accessMode" value="public" onchange="handleAccessModeChange()">
+                            <span class="toggle-slider"></span>
+                        </div>
+                        <span>局域网和公网都允许</span>
+                    </label>
+                </div>
+                <p class="field-help field-help-spaced">
+                    建议：内网优先使用“仅局域网访问”，需要精确控制来源时使用“IP 白名单”。
+                </p>
+            </div>
+            <!-- 预留未来功能：用户认证
+            <hr>
+            <div class="form-group">
+                <label>用户名（可选，开发中）</label>
+                <input type="text" id="systemUsername" placeholder="留空表示不设用户名">
+                <p class="field-help field-help-tight">用于未来的用户认证功能。</p>
+            </div>
+            <div class="form-group">
+                <label>密码（可选，开发中）</label>
+                <input type="password" id="systemPassword" placeholder="留空表示不修改密码">
+                <p class="field-help field-help-tight">用于未来的用户认证功能。</p>
+            </div>
+            -->
+            <div class="btn-group">
+                <button class="btn btn-primary" id="saveSystemConfigBtn" type="button" onclick="handleSystemConfigSave(event)">
+                    <i data-lucide="save" class="icon-sm"></i> 保存配置
+                </button>
+            </div>
+            <div id="saveSystemStatus" class="panel-status-text status-muted is-hidden" aria-live="polite"></div>
+        </div>
+    </div>
+    <!-- 邮件通知滑出面板 -->
+    <div class="qb-slide-panel notify-slide-panel" id="notifySlidePanel">
+        <div class="qb-panel-header">
+            <h3><i data-lucide="mail" class="icon-lg"></i> 邮件通知</h3>
+            <button class="qb-panel-close" onclick="toggleNotificationPanel()">×</button>
+        </div>
+        <div class="qb-panel-body panel-form-shell">
+            <div class="site-panel-copy notify-panel-copy">
+                <strong>先填发件邮箱、收件邮箱和 SMTP 信息</strong>
+                <span>收件邮箱可填多个地址，英文逗号分隔；两个通知开关分别控制开始下载和完成下载。</span>
+            </div>
+            <div class="notify-event-grid">
+                <label class="checkbox-group notify-event-card">
+                    <input type="checkbox" id="notifyDownloadStartEnabled">
+                    <span class="notify-event-copy">
+                        <span class="notify-event-title">下载种子邮件通知</span>
+                        <span class="notify-event-desc">QB 开始下载新种子时发送邮件</span>
+                    </span>
+                </label>
+                <label class="checkbox-group notify-event-card">
+                    <input type="checkbox" id="notifyDownloadCompleteEnabled">
+                    <span class="notify-event-copy">
+                        <span class="notify-event-title">下载完成邮件通知</span>
+                        <span class="notify-event-desc">QB 完成下载后发送邮件</span>
+                    </span>
+                </label>
+            </div>
+            <div class="input-row">
+                <div class="form-group">
+                    <label for="notifySenderEmail">发件邮箱</label>
+                    <input type="email" id="notifySenderEmail" placeholder="sender@example.com" autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="notifyRecipientEmail">收件邮箱</label>
+                    <input type="text" id="notifyRecipientEmail" placeholder="a@example.com, b@example.com" autocomplete="email">
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="form-group">
+                    <label for="notifySenderName">发件昵称</label>
+                    <input type="text" id="notifySenderName" placeholder="Auto PT Downloader">
+                </div>
+                <div class="form-group">
+                    <label for="notifySmtpPort">SMTP 端口</label>
+                    <input type="number" id="notifySmtpPort" min="1" max="65535" placeholder="465">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="notifySmtpHost">SMTP 服务器</label>
+                <input type="text" id="notifySmtpHost" placeholder="smtp.example.com">
+            </div>
+            <div class="input-row">
+                <div class="form-group">
+                    <label for="notifyTransportMode">加密方式</label>
+                    <select id="notifyTransportMode">
+                        <option value="ssl">SSL / SMTPS</option>
+                        <option value="starttls">STARTTLS</option>
+                        <option value="plain">明文（不推荐）</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="notifySmtpPassword">SMTP 授权码 / 密码</label>
+                    <input type="password" id="notifySmtpPassword" placeholder="首次配置必填，保存后可留空" autocomplete="new-password">
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" id="testNotificationBtn" type="button" onclick="testNotificationEmail()">
+                    <i data-lucide="send" class="icon-sm"></i> 测试发送
+                </button>
+                <button class="btn btn-primary" id="saveNotificationBtn" type="button" onclick="handleNotificationConfigSave(event)">
+                    <i data-lucide="save" class="icon-sm"></i> 保存配置
+                </button>
+            </div>
+            <div id="saveNotificationStatus" class="panel-status-text status-muted is-hidden" aria-live="polite"></div>
+        </div>
+    </div>
+    <div class="qb-panel-overlay" id="qbPanelOverlay" onclick="toggleQBPanel()"></div>
+    <div class="qb-panel-overlay" id="sitePanelOverlay" onclick="toggleSitePanel()"></div>
+    <div class="qb-panel-overlay" id="systemPanelOverlay" onclick="toggleSystemPanel()"></div>
+    <div class="qb-panel-overlay" id="notifyPanelOverlay" onclick="toggleNotificationPanel()"></div>
+
+    <!-- Toast Notification (在所有模态框之后，确保最上层) -->
+    <div class="toast" id="toast">
+        <span id="toastIcon">✓</span>
+        <span id="toastMessage"></span>
+    </div>
+
+    <!-- IP 白名单管理弹窗 -->
+    <div class="modal" id="whitelistModal">
+        <div class="modal-content centered modal-sm">
+            <div class="modal-header">
+                <h3><i data-lucide="shield-check" class="icon-lg icon-accent"></i> IP 白名单管理</h3>
+                <button class="modal-close" onclick="closeWhitelistModal()">&times;</button>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <p class="modal-intro">
+                    请输入允许访问的 IP 地址，每行一个 IP。支持完整 IP 或通配符（如 192.168.1.）
+                </p>
+                <textarea id="whitelistInput" rows="8" placeholder="192.168.1.100&#10;192.168.1.101&#10;10.0.0.1" 
+                          class="modal-textarea modal-textarea-mono"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeWhitelistModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveWhitelist()">
+                    <i data-lucide="save" class="icon-sm"></i> 保存
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 端口修改确认弹窗 -->
+    <div class="modal" id="portChangeModal">
+        <div class="modal-content centered modal-sm">
+            <div class="modal-header">
+                <h3><i data-lucide="network" class="icon-lg icon-accent"></i> 端口修改确认</h3>
+            </div>
+            <div class="modal-body">
+                <p class="modal-intro">您修改了 Web 服务端口，修改后需要<strong>重启服务</strong>才能生效。</p>
+                
+                <div class="detail-card">
+                    <div class="detail-row">
+                        <span class="detail-key">当前端口：</span>
+                        <span id="oldPortNumber" class="detail-value">5000</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-key">新端口：</span>
+                        <span id="newPortNumber" class="detail-value detail-value-accent">6000</span>
+                    </div>
+                    <div class="detail-row detail-row-separated">
+                        <span class="detail-key">新访问地址：</span>
+                        <span id="newPortUrl" class="detail-value detail-value-success">http://localhost:6000</span>
+                    </div>
+                </div>
+                
+                <p class="field-note">API 密钥（已隐藏）：</p>
+                <input type="text" id="modalSecretInput" class="field-input-full detail-input" readonly>
+                
+                <p class="warning-note">重启服务后，请使用新地址 <span id="newPortUrl2">http://localhost:新端口</span> 访问。</p>
+            </div>
+            <div class="modal-footer modal-footer-equal">
+                <button class="btn btn-secondary" onclick="cancelPortChange()">取消</button>
+                <button class="btn btn-primary" onclick="confirmPortChange()">
+                    <i data-lucide="check" class="icon-sm"></i> 确认修改
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 首次使用提示弹窗 -->
+    <div class="modal" id="firstTimeModal">
+        <div class="modal-content centered modal-sm recovery-setup-modal">
+            <div class="modal-header">
+                <h3 class="recovery-setup-title"><i data-lucide="shield-alert" class="icon-lg icon-warning"></i> 重要：首次使用提醒</h3>
+            </div>
+            <div class="modal-body modal-form-shell">
+                <p class="modal-intro">为保护系统安全，建议先设置 API 认证密钥。</p>
+                <div class="detail-card recovery-setup-card">
+                    <div class="detail-card-header">
+                        <i data-lucide="shield" class="detail-card-icon"></i>
+                        <span class="detail-card-title">安全建议</span>
+                    </div>
+                    <ul class="detail-list">
+                        <li>设置后，所有 API 操作需要认证</li>
+                        <li class="recovery-code-item"><strong>首次保存后会生成一次性恢复码，只显示一次。</strong>建议至少完成邮箱通知备份或离线保存。</li>
+                        <li>密钥修改后需要刷新页面</li>
+                        <li>建议使用随机生成的密钥</li>
+                    </ul>
+                </div>
+                <p class="warning-note recovery-choice-note">建议优先配置邮箱通知，或离线保存恢复码。</p>
+            </div>
+            <div class="modal-footer modal-footer-equal">
+                <button class="btn btn-secondary" onclick="closeFirstTimeModal()">暂不设置</button>
+                <button class="btn btn-primary" onclick="goToSystemSettings()">
+                    <i data-lucide="settings" class="icon-sm"></i> 去设置
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script type="module" src="js/utils.js?v=167"></script>
+    <script type="module" src="js/api.js?v=174"></script>
+    <script type="module" src="js/sites.js?v=181"></script>
+ <script type="module" src="js/logs.js?v=199"></script>
+    <script type="module" src="js/history.js?v=187"></script>
+    <script type="module" src="js/preview.js?v=176"></script>
+    <!-- 版本号更新记录：
+    v=101: 修复 cache_key 未定义问题，添加种子统计信息显示
+    v=102: 调整种子信息显示顺序：站点→时间→大小→分类
+    v=103: 历史记录增强：站点/大小/状态/完成时间
+    v=106: 综合过滤弹窗、站点配置弹窗、历史记录管理 UI 优化
+    v=110: 注释所有预获取相关代码（前后端），保留代码结构供未来使用
+    v=111: 修复 Web 下载种子时 site_name 和 size 未传递到历史记录的问题
+    v=112: 历史记录搜索框改为动态匹配（前端过滤），去掉回车搜索和大小匹配
+    v=113: 搜索优化 - 加载全部历史记录到缓存，确保搜索能匹配所有历史数据
+    v=114: 预览框添加搜索功能（动态匹配 RSS 种子标题和站点来源）
+    v=115: 修复 preview.js 变量重复声明错误（renderTorrentItem 参数名冲突）
+    v=116: 修复 preview.js 重复导出错误（删除重复的 export 块）
+    v=117: 修复预览框结构混乱（简化渲染逻辑，统一在 renderPreviewToolbar 中完成）
+    v=118: 优化预览框统计信息布局（降低高度，字体从 24px 改为 16px）
+    v=119: 预览框布局完全按照历史记录管理（去掉统计数据，添加分页功能）
+    v=120: 修复 preview.js 重复声明错误（删除旧的 renderPreviewList 函数）
+    v=121: 修复 preview.js 语法错误（删除残留的 askRedownload 代码片段）
+    v=122: 修复 preview.js 缺少 loadPreviewData 函数导出
+    v=123: 修复 preview.js 缺少 renderTorrentItem 函数
+    v=124: 修复 preview.js 缺少 utils.js 导入（escapeHtml, formatDateTime）
+    v=125: 预览框布局完全按照历史记录管理（工具栏 + 操作栏 + 列表区 + 分页栏）
+    v=126: 修复 downloadMultipleTorrents 函数缺少 downloadTorrents 导入
+    v=127: 制定项目备份规则（BACKUP_RULES.md），规范备份流程
+    v=128: 修复种子大小显示为 0 的问题（后端返回 GB 单位，前端不应再次转换）
+    v=129: 搜索增强：添加连续子串匹配 + 结果排序（前缀匹配优先，字母顺序次之）
+    v=130: 优化下载体验：先显示预览框加载动画，再请求种子数据（方案 A）
+    v=131: 统一过滤框输入框宽度（匹配关键词改为 min-width: 100%）
+    v=132: 修复 QB 标签未创建问题（优先使用站点 tags 配置，其次全局配置，最后默认值）
+    v=133: 添加 tags 调试日志（记录实际传递给 qBittorrent 的标签）
+    v=134: 修复 Web 下载接口 tags 逻辑（/api/download 和/api/download_single 都要使用站点 tags）
+    v=135: 修复添加站点时 tags 字段未保存问题（POST /api/sites 需要保存 tags）
+    v=136: 添加下载完成后自动删除功能（auto_delete 和 delete_files 配置选项）
+    v=137: 实现站点级别自动删除（每个站点独立配置 auto_delete 和 delete_files，清理逻辑集成到 process_single_site）
+    v=138: 添加站点级"已下载种子清除时间"配置（独立于 RSS 刷新间隔，支持 0 或留空使用 RSS 间隔）
+    v=139: 【安全修复】添加 API 认证机制、CORS 限制、敏感信息过滤、密码保护
+    v=140: 新增系统设置按钮，系统配置独立于 QB 配置
+    v=141: 系统设置添加随机生成 API 密钥按钮
+    v=142: 修复系统设置认证循环依赖问题，支持首次设置 secret
+    v=143: 【关键修复】后端深度合并配置，保存时不再丢失站点配置
+    v=144: 修复 filter_sensitive_config 不返回 app.secret 的问题
+    v=145: 修复 window.apiConfig 未导出的问题
+    v=146: 修复 loadConfig 未正确提取 API 返回的 config 字段
+    v=147: 隐藏系统设置中预留的用户名和密码输入框
+    v=148: 系统设置滑出面板样式，保存后自动刷新页面
+    v=149: 新增访问控制功能（仅局域网/IP 白名单/允许公网）
+    v=150: 修复访问控制模式布局显示问题
+    v=151: 新增 Web 端口自定义功能
+    v=152: 优化 IP 白名单输入框样式，固定宽度 380px
+    v=153: 访问控制模式改用滑块开关样式
+    v=154: IP 白名单输入框加宽，QB 设置和系统设置位置调整
+    v=169: 修复过滤规则保存未带认证 token 问题
+    v=193: 统一弹窗、工具栏与系统设置的视觉风格
+    v=194: 统一 toast、历史记录与预览列表的视觉细节
+    v=195: 强化 PT 站点卡片的状态、开关与动作按钮风格
+    v=196: 新增邮件通知滑出面板与首次恢复码提示优化
+    v=197: 邮件通知改为下载开始/完成双事件开关
+    -->
+<script type="module" src="js/main.js?v=254"></script>
+    <script>lucide.createIcons();</script>
+    
+<!-- 自动调整 textarea 宽度和高度 -->
+    <script>
+    function autoResizeTextareaWidth(textarea) {
+        if (window.autoResizeTextarea) {
+            window.autoResizeTextarea(textarea);
+        }
+    }
+    </script>
+</body>
+</html>

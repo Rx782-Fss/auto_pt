@@ -1,0 +1,51 @@
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+pytest-cache-files-*/
+src/__pycache__/
+tests/__pycache__/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Runtime data and local secrets
+/logs/
+/data/
+/runtime/
+/tmp/
+/artifacts/
+/backups/
+/config/
+/docs/
+/config*.yaml
+!/config.yaml.example
+/auto_pt.key
+/session_tokens.json
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Local editor / OS files
+/AGENTS.md
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# Local backups and temporary files
+*.bak
+*.tmp
+*.temp
+nul

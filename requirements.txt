@@ -1,0 +1,7 @@
+Flask>=3.0,<4
+flask-cors>=4.0,<5
+PyYAML>=6.0,<7
+requests>=2.31,<3
+feedparser>=6.0,<7
+cryptography>=42,<46
+bencodepy>=0.9,<1

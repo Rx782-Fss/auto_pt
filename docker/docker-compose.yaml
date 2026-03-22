@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  pt-auto:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: pt-auto-downloader
+    ports:
+      - "5000:5000"
+    volumes:
+      # 挂载配置文件（文件挂载）
+      - ../config.yaml:/app/config.yaml
+      # 挂载数据目录
+      - ../data:/app/data
+      # 挂载日志目录
+      - ../logs:/app/logs
+    environment:
+      - TZ=Asia/Shanghai
+      - AUTO_PT_KEY_FILE=/app/data/auto_pt.key
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

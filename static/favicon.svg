@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="bg" x1="32" x2="32" y1="6" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a" stop-opacity="0.96"/>
+      <stop offset="1" stop-color="#1e293b" stop-opacity="0.92"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="20" cy="18" r="26" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bolt" x1="23" x2="42" y1="17" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#bae6fd"/>
+      <stop offset="1" stop-color="#38bdf8"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="52" height="52" rx="14" fill="url(#bg)"/>
+  <rect x="6.5" y="6.5" width="51" height="51" rx="13.5" fill="none" stroke="#38bdf8" stroke-opacity="0.18"/>
+  <circle cx="20" cy="18" r="22" fill="url(#glow)"/>
+  <path
+    d="M35.6 14.5 21.8 33.1c-.6.8 0 2 .9 2H30l-1.7 15.1c-.1 1.2 1.4 1.8 2.2.9l13.7-18.7c.6-.8 0-2-.9-2h-7.2l1.7-15.1c.1-1.2-1.4-1.8-2.2-.8Z"
+    fill="url(#bolt)"
+  />
+</svg>

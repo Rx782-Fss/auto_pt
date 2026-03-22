@@ -1,0 +1,29 @@
+name: Feature Request
+description: 提交一个功能建议
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题
+      description: 描述当前痛点，而不只是描述方案。
+      placeholder: 例如：站点越来越多时，首页调度信息不方便快速扫描。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 你希望怎么改
+      description: 可以描述交互、接口、配置项或部署体验上的期望。
+      placeholder: 例如：希望首页支持折叠站点调度，并允许按站点名称筛选。
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息
+      description: 可以补充使用场景、草图、截图或兼容性要求。

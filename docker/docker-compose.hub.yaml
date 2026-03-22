@@ -1,0 +1,24 @@
+services:
+  pt-auto:
+    image: futubu/pt-auto-downloader:1.2.0
+    container_name: pt-auto-downloader
+    ports:
+      - "5000:5000"
+    volumes:
+      # 挂载配置目录，首次启动时会自动生成 config.yaml
+      - ../config:/app/config
+      # 挂载数据目录
+      - ../data:/app/data
+      # 挂载日志目录
+      - ../logs:/app/logs
+    environment:
+      TZ: Asia/Shanghai
+      AUTO_PT_CONFIG_FILE: /app/config/config.yaml
+      AUTO_PT_KEY_FILE: /app/data/auto_pt.key
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
