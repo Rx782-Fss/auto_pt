@@ -1,0 +1,87 @@
+name: Docker Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  IMAGE_NAME: futubu/pt-auto-downloader
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Show tool versions
+        run: |
+          python --version
+          node --version
+          docker --version
+
+      - name: Run checks
+        run: python tools/run_checks.py
+
+      - name: Verify release metadata
+        run: python tools/check_release_metadata.py --tag "${GITHUB_REF_NAME}"
+
+      - name: Export clean release directory
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/pt-auto-release
+        run: python tools/export_release.py --target "$RELEASE_DIR"
+
+      - name: Verify exported release directory
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/pt-auto-release
+        run: python tools/export_release.py --verify-only --target "$RELEASE_DIR"
+
+      - name: Login to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "[FAIL] 缺少 Docker Hub 凭据，请在 GitHub Secrets 中配置 DOCKERHUB_USERNAME 和 DOCKERHUB_TOKEN"
+            exit 1
+          fi
+
+          echo "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+
+      - name: Build Docker image from clean release directory
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/pt-auto-release
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          docker build \
+            --file "$RELEASE_DIR/docker/Dockerfile" \
+            --tag "$IMAGE_NAME:$VERSION" \
+            --tag "$IMAGE_NAME:latest" \
+            "$RELEASE_DIR"
+
+      - name: Push Docker image
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          docker push "$IMAGE_NAME:$VERSION"
+          docker push "$IMAGE_NAME:latest"

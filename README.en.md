@@ -90,7 +90,8 @@ app:
   access_control: lan
   allowed_ips: []
   secret: YOUR_SECRET_KEY_HERE_CHANGE_ME
-  version: 1.2.0
+  session_token_ttl_days: 30
+  version: 1.2.1
   web_port: 5000
 
 log_level: WARNING
@@ -149,6 +150,7 @@ Notes:
 - `download_settings.auto_download`: whether to automatically download newly discovered torrents
 - `download_settings.auto_delete`: whether to automatically clean completed torrents for that site
 - `download_settings.delete_files`: whether to delete files together with the torrent
+- `app.session_token_ttl_days`: Web session lifetime in days. Default is 30 days, and restarts try to recover from `data/session_tokens.json`
 
 ### Email Notifications (Optional)
 
@@ -164,12 +166,20 @@ The project currently supports test email delivery and notifications for events 
 ## Image Tags
 
 - `latest`: rolling tag that follows the newest release, suitable when you want ongoing updates
-- `1.2.0`: pinned current release tag, suitable for reproducible and stable deployments
+- `1.2.1`: pinned current release tag, suitable for reproducible and stable deployments
 
 ## Local Run
 
 ```bash
-pip install -r requirements.txt
+# Windows
+py -3 -m venv .venv
+.venv\Scripts\activate
+python -m pip install -r requirements.txt
+
+# Linux
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
 Copy and edit the configuration:
@@ -193,11 +203,22 @@ chmod +x start.sh
 ./start.sh
 ```
 
+Notes:
+
+- The start scripts prefer the repository-local `.venv` when it exists.
+- Linux scripts automatically fall back to system `python3` or `python`.
+- Windows scripts automatically fall back to `py -3` or `python`.
+- If `config.yaml` does not exist yet, the start scripts create it from `config.yaml.example`.
+
 ## Development and Checks
 
 Development startup:
 
 ```bash
+# Activate the virtual environment first
+# Windows: .venv\Scripts\activate
+# Linux: source .venv/bin/activate
+
 python main.py -d
 python web.py
 ```
@@ -218,6 +239,38 @@ The check scripts perform:
 - Python syntax checks
 - Frontend JavaScript syntax checks
 - Regression tests under `tests/`
+- Release metadata consistency checks, including version strings, homepage version flow, and Docker tags
+
+## Release Process
+
+Run release operations from the source repository root. Do not use the exported `发布/` directory for code commits or Git tags.
+
+Recommended release sequence:
+
+```bash
+# 1. Run all checks in the source repository
+./check.sh
+
+# 2. Export a clean release directory for final inspection
+./export-release.sh --target ../发布
+
+# 3. Commit and push source changes
+git add .
+git commit -m "release: v<version>"
+git push origin main
+
+# 4. Create and push the version tag
+git tag v<version>
+git push origin v<version>
+```
+
+Release rules:
+
+- The Git tag must match `app.version` in `config.yaml.example`.
+- The GitHub Release page body is generated directly from the current version section in `CHANGELOG.md` instead of auto-generated release notes.
+- GitHub Actions runs the full checks, version validation, and exported-release whitelist validation before uploading the Release artifact.
+- Docker publishing builds from the clean exported release directory and pushes both `futubu/pt-auto-downloader:<version>` and `futubu/pt-auto-downloader:latest`.
+- The exported `发布/` directory is only for final verification and distribution. It excludes local or maintenance-only files such as `config.yaml`, `auto_pt.key`, `data/`, `logs/`, `.github/`, and `AGENTS.md`.
 
 ## FAQ
 

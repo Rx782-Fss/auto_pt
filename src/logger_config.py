@@ -74,6 +74,7 @@ DEFAULT_CONFIG = {
 
 ENV_LOG_DIR = "AUTO_PT_LOG_DIR"
 ENV_LOG_FILE = "AUTO_PT_LOG_FILE"
+BASE_DIR = Path(__file__).parent.parent.resolve()
 
 
 def _close_all_handlers(root_logger: logging.Logger):
@@ -101,6 +102,55 @@ def _configure_external_loggers(log_config: Dict[str, Any], default_level: int):
     flask_cors_logger.setLevel(request_level if suppress_request_logs else default_level)
 
 
+def _build_effective_log_config(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """合并默认值、配置文件和环境变量，得到最终日志配置。"""
+    log_config = {**DEFAULT_CONFIG, **(config or {})}
+
+    env_log_dir = os.getenv(ENV_LOG_DIR, "").strip()
+    env_log_file = os.getenv(ENV_LOG_FILE, "").strip()
+    if env_log_dir:
+        log_config["dir"] = env_log_dir
+    if env_log_file:
+        log_config["file"] = env_log_file
+
+    return log_config
+
+
+def resolve_log_targets(
+    config: Optional[Dict[str, Any]] = None,
+    base_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """解析日志目录、主日志文件和错误日志文件路径。"""
+    log_config = _build_effective_log_config(config)
+    project_root = (base_dir or BASE_DIR).resolve()
+
+    log_dir = Path(str(log_config.get("dir", "logs") or "logs")).expanduser()
+    if not log_dir.is_absolute():
+        log_dir = project_root / log_dir
+
+    log_file = str(log_config.get("file", "auto_pt.log") or "auto_pt.log")
+    log_path = Path(log_file).expanduser()
+    if not log_path.is_absolute():
+        if log_path.parent != Path("."):
+            log_path = log_dir / log_path.name
+        else:
+            log_path = log_dir / log_file
+
+    error_path = None
+    error_file = log_config.get("error_file")
+    if error_file:
+        error_path = Path(str(error_file)).expanduser()
+        if not error_path.is_absolute():
+            error_path = log_dir / error_path
+
+    return {
+        "log_config": log_config,
+        "log_dir": log_dir,
+        "log_path": log_path,
+        "error_path": error_path,
+    }
+
+
 def setup_logging(
     config: Optional[Dict[str, Any]] = None,
     app_name: str = "auto_pt",
@@ -125,42 +175,12 @@ def setup_logging(
         # 快速初始化 (使用默认配置)
         setup_logging()
     """
-    # 合并配置
-    log_config = {**DEFAULT_CONFIG, **(config or {})}
+    resolved_targets = resolve_log_targets(config, base_dir=BASE_DIR)
+    log_config = resolved_targets["log_config"]
+    log_dir = resolved_targets["log_dir"]
+    log_path = resolved_targets["log_path"]
+    error_path = resolved_targets["error_path"]
 
-    env_log_dir = os.getenv(ENV_LOG_DIR, "").strip()
-    env_log_file = os.getenv(ENV_LOG_FILE, "").strip()
-    if env_log_dir:
-        log_config["dir"] = env_log_dir
-    if env_log_file:
-        log_config["file"] = env_log_file
-    
-    # 解析配置
-    # 处理日志目录路径
-    log_dir_str = log_config.get('dir', 'logs')
-    log_dir = Path(log_dir_str)
-    
-    # 如果是相对路径，使用项目根目录作为基准
-    if not log_dir.is_absolute():
-        # 尝试获取项目根目录
-        try:
-            project_root = Path(__file__).parent.parent
-            log_dir = project_root / log_dir
-        except:
-            log_dir = Path.cwd() / log_dir
-    
-    # 处理日志文件路径（可能已经包含完整路径）
-    log_file = log_config.get('file', 'auto_pt.log')
-    log_path = Path(log_file)
-    
-    # 如果 file 是相对路径，附加到 log_dir
-    if not log_path.is_absolute():
-        # 如果 file 已经包含目录（如 logs/auto_pt.log），只使用文件名
-        if log_path.parent != Path('.'):
-            # file 包含目录结构，只取文件名
-            log_path = log_dir / log_path.name
-        else:
-            log_path = log_dir / log_file
     level_name = log_config.get('level', 'INFO').upper()
     level = getattr(logging, level_name, logging.INFO)
     max_bytes = log_config.get('max_bytes', 10 * 1024 * 1024)
@@ -224,8 +244,8 @@ def setup_logging(
     root_logger.addHandler(file_handler)
     
     # 创建错误日志处理器 (可选)
-    if error_file:
-        error_path = log_dir / error_file
+    if error_file and error_path is not None:
+        error_path.parent.mkdir(parents=True, exist_ok=True)
         error_handler = RotatingFileHandler(
             error_path,
             maxBytes=max_bytes,

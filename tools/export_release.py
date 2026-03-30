@@ -13,11 +13,14 @@ DEFAULT_TARGET = PROJECT_ROOT.parent / "发布"
 TOP_LEVEL_FILES = [
     ".gitignore",
     ".dockerignore",
+    "CHANGELOG.md",
     "README.md",
     "README.en.md",
     "LICENSE",
     "requirements.txt",
     "config.yaml.example",
+    "check.bat",
+    "check.sh",
     "main.py",
     "web.py",
     "start.bat",
@@ -28,6 +31,8 @@ TOP_LEVEL_DIRS = [
     "docker",
     "src",
     "static",
+    "tests",
+    "tools",
 ]
 
 IGNORE_DIR_NAMES = {
@@ -91,6 +96,36 @@ def should_skip(path: Path) -> bool:
     return False
 
 
+def validate_release_directory(target: Path, include_docs: bool) -> None:
+    target_root = target.resolve()
+    if not target_root.exists():
+        raise FileNotFoundError(f"发布目录不存在：{target_root}")
+
+    allowed_top_level_names = set(TOP_LEVEL_FILES) | set(TOP_LEVEL_DIRS)
+    if include_docs:
+        allowed_top_level_names.add("docs")
+
+    unexpected_top_level_entries: list[str] = []
+    for entry in sorted(target_root.iterdir(), key=lambda item: item.name.lower()):
+        if entry.name not in allowed_top_level_names:
+            unexpected_top_level_entries.append(entry.name)
+
+    if unexpected_top_level_entries:
+        names = ", ".join(unexpected_top_level_entries)
+        raise ValueError(f"发布目录包含未允许的顶层条目：{names}")
+
+    disallowed_entries: list[str] = []
+    for entry in sorted(target_root.rglob("*"), key=lambda item: str(item.relative_to(target_root)).lower()):
+        if should_skip(entry):
+            disallowed_entries.append(str(entry.relative_to(target_root)))
+
+    if disallowed_entries:
+        formatted_entries = "\n".join(f"- {entry}" for entry in disallowed_entries)
+        raise ValueError(f"发布目录校验失败，发现不应发布的内容：\n{formatted_entries}")
+
+    print(f"[VERIFY] {target_root}")
+
+
 def iter_files(directory: Path) -> Iterable[Path]:
     for entry in sorted(directory.iterdir(), key=lambda item: item.name.lower()):
         if should_skip(entry):
@@ -145,6 +180,9 @@ def export_release(target: Path, dry_run: bool, clean: bool, include_docs: bool)
             relative_path = src_file.relative_to(source_root)
             copy_file(src_file, target_root / relative_path, dry_run)
 
+    if not dry_run:
+        validate_release_directory(target_root, include_docs=include_docs)
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -171,12 +209,28 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="把 docs/ 目录一并导出到发布目录。默认不导出文档。",
     )
+    parser.add_argument(
+        "--verify-only",
+        action="store_true",
+        help="仅校验现有发布目录内容，不执行导出。",
+    )
     return parser
 
 
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.verify_only and args.dry_run:
+        parser.error("--verify-only 不能和 --dry-run 同时使用")
+
+    if args.verify_only:
+        validate_release_directory(
+            target=args.target,
+            include_docs=args.include_docs,
+        )
+        print("[DONE] 发布目录检查通过")
+        return 0
 
     export_release(
         target=args.target,

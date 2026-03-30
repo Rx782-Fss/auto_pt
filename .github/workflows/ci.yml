@@ -58,6 +58,9 @@ jobs:
       - name: Regression tests
         run: python tools/run_checks.py --section tests
 
+      - name: Verify release metadata
+        run: python tools/check_release_metadata.py
+
       - name: Verify release export script
         if: runner.os == 'Linux'
         run: python tools/export_release.py --target "$RUNNER_TEMP/pt-auto-release"

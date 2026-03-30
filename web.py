@@ -5,16 +5,23 @@ import os
 import json
 import copy
 import hashlib
+import ipaddress
 import time
 import requests
 import hmac
 import secrets
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
-from src.logger_config import setup_logging, get_logger, log_startup_message, reload_logging
+from src.logger_config import (
+    setup_logging,
+    get_logger,
+    log_startup_message,
+    reload_logging,
+    resolve_log_targets,
+)
 from src.log_constants import (
     LOG_WEB_SERVICE,
     LOG_WEB_ACCESS,
@@ -58,8 +65,6 @@ try:
 except:
     _INITIAL_CONFIG = {}
 setup_logging(_INITIAL_CONFIG.get('logging', {}))
-HISTORY_FILE = BASE_DIR / 'data' / 'history.json'
-LOG_FILE = BASE_DIR / 'logs' / 'auto_pt.log'
 MAX_LOG_TAIL_BYTES = 1024 * 1024
 MAX_LOG_TAIL_LINES = 1000
 
@@ -71,16 +76,107 @@ CORS(app, origins=["http://localhost:5000", "http://127.0.0.1:5000", "http://loc
 logger = get_logger(__name__)
 
 _preview_cache = {}
-SESSION_TOKEN_TTL_SECONDS = 12 * 60 * 60
+DEFAULT_SESSION_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60
 _session_tokens = {}
 _session_tokens_lock = threading.Lock()
-_SESSION_TOKENS_FILE = BASE_DIR / 'data' / 'session_tokens.json'
 _FIRST_TIME_ALLOWED_PATHS = {'/api/config'}
 _RECOVERY_CODE_GROUP_SIZE = 4
 _SESSION_TOKENS_PERSIST_MIN_INTERVAL_SECONDS = 300
 _SESSION_TOKENS_PERSIST_RETRY_DELAYS = (0.05, 0.15, 0.3, 0.6)
 _session_tokens_last_persist_at = 0.0
 _session_tokens_last_warning_at = 0.0
+
+
+def _resolve_log_file(config: dict | None = None) -> Path:
+    """解析当前生效的主日志文件路径，保持与日志器完全一致。"""
+    config_data = config if isinstance(config, dict) else {}
+    logging_config = dict(config_data.get('logging', {}) or {})
+    return resolve_log_targets(logging_config, base_dir=BASE_DIR)["log_path"]
+
+
+LOG_FILE = _resolve_log_file(_INITIAL_CONFIG)
+
+
+def _get_active_log_file() -> Path:
+    """获取当前运行时生效的主日志文件路径。"""
+    try:
+        current_config = load_config()
+    except Exception:
+        return LOG_FILE
+    return _resolve_log_file(current_config)
+
+
+def _resolve_runtime_data_dir() -> Path:
+    """解析运行时数据目录，优先跟随密钥文件目录。"""
+    env_key_file = os.getenv("AUTO_PT_KEY_FILE", "").strip()
+    if env_key_file:
+        key_path = Path(env_key_file).expanduser()
+        if not key_path.is_absolute():
+            key_path = (BASE_DIR / key_path).resolve()
+        return key_path.parent
+    return BASE_DIR / 'data'
+
+
+def _resolve_session_tokens_file() -> Path:
+    """解析会话 token 持久化文件路径。"""
+    env_tokens_file = os.getenv("AUTO_PT_SESSION_TOKENS_FILE", "").strip()
+    if env_tokens_file:
+        tokens_path = Path(env_tokens_file).expanduser()
+        if not tokens_path.is_absolute():
+            tokens_path = (BASE_DIR / tokens_path).resolve()
+        return tokens_path
+    return _resolve_runtime_data_dir() / 'session_tokens.json'
+
+
+def _resolve_history_file() -> Path:
+    """解析历史记录文件路径，保持与运行时数据目录一致。"""
+    env_history_file = os.getenv("AUTO_PT_HISTORY_FILE", "").strip()
+    if env_history_file:
+        history_path = Path(env_history_file).expanduser()
+        if not history_path.is_absolute():
+            history_path = (BASE_DIR / history_path).resolve()
+        return history_path
+    return _resolve_runtime_data_dir() / 'history.json'
+
+
+def _to_positive_int(value, default: int) -> int:
+    """把输入转为正整数，失败时返回默认值。"""
+    try:
+        normalized = int(value)
+    except Exception:
+        return int(default)
+    return normalized if normalized > 0 else int(default)
+
+
+def _get_session_token_ttl_seconds(config: dict | None = None) -> int:
+    """获取会话 token 有效期，默认 30 天。"""
+    env_ttl_seconds = os.getenv("AUTO_PT_SESSION_TOKEN_TTL_SECONDS", "").strip()
+    if env_ttl_seconds:
+        return _to_positive_int(env_ttl_seconds, DEFAULT_SESSION_TOKEN_TTL_SECONDS)
+
+    current_config = config if isinstance(config, dict) else {}
+    if not isinstance(config, dict):
+        try:
+            current_config = load_config()
+        except Exception:
+            return DEFAULT_SESSION_TOKEN_TTL_SECONDS
+    if not isinstance(current_config, dict):
+        return DEFAULT_SESSION_TOKEN_TTL_SECONDS
+    app_config = current_config.get('app', {}) if isinstance(current_config, dict) else {}
+
+    ttl_seconds = app_config.get('session_token_ttl_seconds')
+    if ttl_seconds not in (None, ''):
+        return _to_positive_int(ttl_seconds, DEFAULT_SESSION_TOKEN_TTL_SECONDS)
+
+    ttl_days = app_config.get('session_token_ttl_days')
+    if ttl_days not in (None, ''):
+        return _to_positive_int(ttl_days, 30) * 24 * 60 * 60
+
+    return DEFAULT_SESSION_TOKEN_TTL_SECONDS
+
+
+_SESSION_TOKENS_FILE = _resolve_session_tokens_file()
+HISTORY_FILE = _resolve_history_file()
 
 
 def _extract_auth_token(auth_header) -> str:
@@ -226,24 +322,26 @@ def _load_session_tokens_from_disk():
     if needs_persist:
         _persist_session_tokens_to_disk(force=True)
 
-def _issue_session_token() -> tuple[str, int]:
+def _issue_session_token(ttl_seconds: int | None = None) -> tuple[str, int]:
     """签发短期会话 token。"""
+    effective_ttl = _get_session_token_ttl_seconds() if ttl_seconds is None else int(ttl_seconds)
     with _session_tokens_lock:
         now = time.time()
         _cleanup_expired_session_tokens(now)
         session_token = secrets.token_urlsafe(32)
-        expires_at = int(now + SESSION_TOKEN_TTL_SECONDS)
+        expires_at = int(now + effective_ttl)
         _session_tokens[session_token] = expires_at
         _persist_session_tokens_to_disk(force=True)
         return session_token, expires_at
 
 
-def _validate_session_token(token: str) -> bool:
+def _validate_session_token(token: str, ttl_seconds: int | None = None) -> bool:
     """校验并续期会话 token。"""
     normalized_token = str(token or '').strip()
     if not normalized_token:
         return False
 
+    effective_ttl = _get_session_token_ttl_seconds() if ttl_seconds is None else int(ttl_seconds)
     with _session_tokens_lock:
         now = time.time()
         expires_at = _session_tokens.get(normalized_token)
@@ -254,7 +352,7 @@ def _validate_session_token(token: str) -> bool:
             _persist_session_tokens_to_disk(force=True)
             return False
 
-        _session_tokens[normalized_token] = int(now + SESSION_TOKEN_TTL_SECONDS)
+        _session_tokens[normalized_token] = int(now + effective_ttl)
         _cleanup_expired_session_tokens(now)
         _persist_session_tokens_to_disk()
         return True
@@ -324,7 +422,9 @@ def _ensure_recovery_code(config, force_new: bool = False) -> str:
     if force_new or not current_code:
         current_code = _generate_recovery_code()
         app_config['recovery_code'] = current_code
-        app_config['recovery_code_created_at'] = datetime.utcnow().isoformat() + 'Z'
+        app_config['recovery_code_created_at'] = (
+            datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+        )
     return current_code
 
 
@@ -380,7 +480,7 @@ def _validate_auth_token(token: str) -> tuple[bool, str]:
     if not normalized_token:
         return False, ''
 
-    if _validate_session_token(normalized_token):
+    if _validate_session_token(normalized_token, ttl_seconds=_get_session_token_ttl_seconds()):
         return True, 'session'
 
     expected_token = get_app_secret()
@@ -438,6 +538,58 @@ def normalize_access_mode(access_mode):
     }
     return aliases.get(mode, mode)
 
+
+def _ip_matches_wildcard_pattern(client_ip: str, pattern: str) -> bool:
+    """支持 203.0.113.x / 203.0.113.* 这种 IPv4 段匹配。"""
+    ip_text = str(client_ip or '').strip()
+    pattern_text = str(pattern or '').strip()
+    if not ip_text or not pattern_text:
+        return False
+
+    ip_parts = ip_text.split('.')
+    pattern_parts = pattern_text.split('.')
+    if len(ip_parts) != 4 or len(pattern_parts) != 4:
+        return False
+
+    for ip_part, pattern_part in zip(ip_parts, pattern_parts):
+        normalized_part = pattern_part.strip().lower()
+        if normalized_part in {'x', '*'}:
+            continue
+        if ip_part != pattern_part.strip():
+            return False
+    return True
+
+
+def is_ip_in_allowed_list(client_ip: str, allowed_ips) -> bool:
+    """判断客户端 IP 是否命中白名单，支持精确 IP、CIDR 和 x/* 通配段。"""
+    ip_text = str(client_ip or '').strip()
+    if not ip_text:
+        return False
+
+    try:
+        ip_obj = ipaddress.ip_address(ip_text)
+    except ValueError:
+        ip_obj = None
+
+    for raw_entry in allowed_ips or []:
+        entry = str(raw_entry or '').strip()
+        if not entry:
+            continue
+        if entry == ip_text:
+            return True
+        if ('x' in entry.lower()) or ('*' in entry):
+            if _ip_matches_wildcard_pattern(ip_text, entry):
+                return True
+            continue
+        if '/' in entry and ip_obj is not None:
+            try:
+                if ip_obj in ipaddress.ip_network(entry, strict=False):
+                    return True
+            except ValueError:
+                continue
+
+    return False
+
 def check_access_control():
     """
     访问控制检查 - 在请求处理前调用
@@ -471,7 +623,7 @@ def check_access_control():
         # 清理 IP 列表（去除空格）
         allowed_ips = [ip.strip() for ip in allowed_ips if ip.strip()]
         
-        if client_ip not in allowed_ips:
+        if not is_ip_in_allowed_list(client_ip, allowed_ips):
             logger.warning(f'{LOG_WEB_ACCESS} IP 不在白名单：{client_ip}')
             return False, f'IP 未授权 ({client_ip})'
 
@@ -1101,11 +1253,12 @@ def save_history(history):
 
 def load_logs():
     try:
-        logger.debug(f"{LOG_WEB_LOGS} 日志文件路径：{LOG_FILE}, 存在：{LOG_FILE.exists()}")
-        if not LOG_FILE.exists():
+        log_file = _get_active_log_file()
+        logger.debug(f"{LOG_WEB_LOGS} 日志文件路径：{log_file}, 存在：{log_file.exists()}")
+        if not log_file.exists():
             return ''
 
-        with LOG_FILE.open('rb') as f:
+        with log_file.open('rb') as f:
             f.seek(0, os.SEEK_END)
             file_size = f.tell()
             start_pos = max(file_size - MAX_LOG_TAIL_BYTES, 0)
@@ -1729,7 +1882,9 @@ def get_logs():
 @require_auth
 def clear_logs():
     try:
-        with open(LOG_FILE, 'w', encoding='utf-8') as f:
+        log_file = _get_active_log_file()
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_file, 'w', encoding='utf-8') as f:
             f.write('')
         return jsonify({'success': True, 'message': '日志已清除'})
     except Exception as e:
@@ -1784,8 +1939,9 @@ def get_status():
         
         # 获取日志文件状态
         log_size = 0
-        if os.path.exists(LOG_FILE):
-            log_size = os.path.getsize(LOG_FILE)
+        log_file = _get_active_log_file()
+        if os.path.exists(log_file):
+            log_size = os.path.getsize(log_file)
         
         return jsonify({
             'success': True,
@@ -1811,7 +1967,7 @@ def get_status():
 @app.route('/api/version', methods=['GET'])
 def get_version():
     """获取应用版本号"""
-    return jsonify({'success': True, 'version': '1.2.0'})
+    return jsonify({'success': True, 'version': '1.2.1'})
 
 
 @app.route('/api/stats', methods=['GET'])
@@ -2504,7 +2660,6 @@ def qb_test():
 
 if __name__ == '__main__':
     os.makedirs(BASE_DIR / 'data', exist_ok=True)
-    os.makedirs(BASE_DIR / 'logs', exist_ok=True)
     
     debug_mode = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     
@@ -2514,11 +2669,7 @@ if __name__ == '__main__':
     web_port = config.get('app', {}).get('web_port', 5000)
 
     log_config = dict(config.get('logging', {}) or {})
-    log_config.update({
-        'dir': str(BASE_DIR / 'logs'),
-        'file': 'auto_pt.log',
-        'use_color': not debug_mode,
-    })
+    log_config['use_color'] = not debug_mode
     log_config.setdefault('level', 'DEBUG' if debug_mode else 'INFO')
     
     setup_logging(log_config)

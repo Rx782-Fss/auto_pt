@@ -9,8 +9,10 @@ app:
   allowed_ips: []
   # Web 界面密钥（用于 session 加密，请修改为随机字符串）
   secret: YOUR_SECRET_KEY_HERE_CHANGE_ME
+  # 会话 token 默认有效期（天），默认 30 天；容器重启后仍可从 data/session_tokens.json 恢复
+  session_token_ttl_days: 30
   # 版本号（自动生成，无需修改）
-  version: 1.2.0
+  version: 1.2.1
   # Web 界面端口
   web_port: 5000
 

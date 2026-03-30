@@ -1,6 +1,6 @@
 services:
   pt-auto:
-    image: futubu/pt-auto-downloader:1.2.0
+    image: futubu/pt-auto-downloader:1.2.1
     container_name: pt-auto-downloader
     ports:
       - "5000:5000"

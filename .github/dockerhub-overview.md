@@ -46,12 +46,12 @@ docker run -d \
 ### 镜像标签
 
 - `latest`：滚动跟随最新发布版本
-- `1.2.0`：当前固定发布版本
+- `1.2.1`：当前固定发布版本
 
 ### 相关链接
 
 - GitHub: [Rx782-Fss/auto_pt](https://github.com/Rx782-Fss/auto_pt)
-- Release: [v1.2.0](https://github.com/Rx782-Fss/auto_pt/releases/tag/v1.2.0)
+- Release: [v1.2.1](https://github.com/Rx782-Fss/auto_pt/releases/tag/v1.2.1)
 
 ### 免责声明
 
@@ -103,12 +103,12 @@ Persisting all three directories is strongly recommended to avoid losing critica
 ### Image Tags
 
 - `latest`: rolling tag that follows the newest release
-- `1.2.0`: pinned current release version
+- `1.2.1`: pinned current release version
 
 ### Links
 
 - GitHub: [Rx782-Fss/auto_pt](https://github.com/Rx782-Fss/auto_pt)
-- Release: [v1.2.0](https://github.com/Rx782-Fss/auto_pt/releases/tag/v1.2.0)
+- Release: [v1.2.1](https://github.com/Rx782-Fss/auto_pt/releases/tag/v1.2.1)
 
 ### Disclaimer
 

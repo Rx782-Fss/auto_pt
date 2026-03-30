@@ -14,6 +14,9 @@ PYTHON_FILES = [
     "src/config.py",
     "src/mteam.py",
     "tests/test_regression.py",
+    "tools/check_release_metadata.py",
+    "tools/export_release.py",
+    "tools/run_checks.py",
 ]
 FRONTEND_FILES = [
     "static/js/api.js",

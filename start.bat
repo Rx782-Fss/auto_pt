@@ -1,7 +1,29 @@
 @echo off
+setlocal
+
+set "ROOT_DIR=%~dp0"
+cd /d "%ROOT_DIR%"
+
+call :resolve_python
+if errorlevel 1 goto :error
+
+set "CONFIG_FILE=%AUTO_PT_CONFIG_FILE%"
+if not defined CONFIG_FILE set "CONFIG_FILE=%ROOT_DIR%config.yaml"
+if not exist "%ROOT_DIR%data" mkdir "%ROOT_DIR%data" >nul 2>nul
+if not exist "%ROOT_DIR%logs" mkdir "%ROOT_DIR%logs" >nul 2>nul
+if not exist "%CONFIG_FILE%" (
+    if exist "%ROOT_DIR%config.yaml.example" (
+        copy /Y "%ROOT_DIR%config.yaml.example" "%CONFIG_FILE%" >nul
+        echo [OK] Default config created: %CONFIG_FILE%
+    )
+)
+
 echo ==========================================
 echo   PT Auto Downloader - Starting
 echo ==========================================
+echo.
+echo [PYTHON] Using: %PYTHON_LABEL%
+echo [CONFIG] File: %CONFIG_FILE%
 echo.
 
 REM ==========================================
@@ -19,8 +41,7 @@ echo.
 
 REM 启动主程序（守护进程）
 echo [1/2] Starting daemon mode (main.py -d)...
-start /B python main.py -d
-set MAIN_PID=%ERRORLEVEL%
+start /B "" "%PYTHON_EXE%" %PYTHON_ARGS% main.py -d
 
 timeout /t 2 /nobreak >nul
 
@@ -30,8 +51,7 @@ echo.
 
 REM 启动 Web 界面
 echo [2/2] Starting web interface (web.py)...
-start /B python web.py
-set WEB_PID=%ERRORLEVEL%
+start /B "" "%PYTHON_EXE%" %PYTHON_ARGS% web.py
 
 timeout /t 2 /nobreak >nul
 
@@ -57,3 +77,35 @@ echo   Example: set QB_PASSWORD=my_pass
 echo.
 
 pause
+exit /b 0
+
+:resolve_python
+if exist "%ROOT_DIR%.venv\Scripts\python.exe" (
+    set "PYTHON_EXE=%ROOT_DIR%.venv\Scripts\python.exe"
+    set "PYTHON_ARGS="
+    set "PYTHON_LABEL=%ROOT_DIR%.venv\Scripts\python.exe"
+    exit /b 0
+)
+
+where py >nul 2>nul
+if not errorlevel 1 (
+    set "PYTHON_EXE=py"
+    set "PYTHON_ARGS=-3"
+    set "PYTHON_LABEL=py -3"
+    exit /b 0
+)
+
+where python >nul 2>nul
+if not errorlevel 1 (
+    set "PYTHON_EXE=python"
+    set "PYTHON_ARGS="
+    set "PYTHON_LABEL=python"
+    exit /b 0
+)
+
+echo [FAIL] Python 3 not found. Please install Python 3 or create .venv first.
+exit /b 1
+
+:error
+echo [FAIL] Startup aborted
+exit /b 1

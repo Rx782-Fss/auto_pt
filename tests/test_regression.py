@@ -7,6 +7,7 @@ import shutil
 import tempfile
 import unittest
 import smtplib
+import warnings
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
@@ -26,6 +27,7 @@ atexit.register(lambda: shutil.rmtree(_TEST_RUNTIME_DIR, ignore_errors=True))
 import web
 import src.crypto_config as crypto_config
 import src.notifications as notifications
+import tools.check_release_metadata as release_metadata
 from src.config import Config
 from src.mteam import MTeamClient
 from src.history import DownloadHistory
@@ -355,6 +357,76 @@ class ConfigApiRegressionTests(unittest.TestCase):
             mock_replace.assert_not_called()
         finally:
             web._session_tokens_last_persist_at = original_last_persist
+
+    def test_issue_session_token_defaults_to_30_days(self):
+        with patch.object(web, "_persist_session_tokens_to_disk", return_value=None), patch.object(
+            web, "load_config", return_value=self._base_config()
+        ), patch.object(web.time, "time", return_value=1_000_000):
+            with web._session_tokens_lock:
+                web._session_tokens.clear()
+            token, expires_at = web._issue_session_token()
+
+        self.assertTrue(token)
+        self.assertEqual(expires_at, 1_000_000 + 30 * 24 * 60 * 60)
+
+    def test_issue_session_token_honors_configured_ttl_days(self):
+        config = self._base_config()
+        config["app"]["session_token_ttl_days"] = 7
+
+        with patch.object(web, "_persist_session_tokens_to_disk", return_value=None), patch.object(
+            web, "load_config", return_value=config
+        ), patch.object(web.time, "time", return_value=2_000_000):
+            with web._session_tokens_lock:
+                web._session_tokens.clear()
+            token, expires_at = web._issue_session_token()
+
+        self.assertTrue(token)
+        self.assertEqual(expires_at, 2_000_000 + 7 * 24 * 60 * 60)
+
+    def test_whitelist_allows_exact_ip_wildcard_and_cidr_entries(self):
+        self.assertTrue(web.is_ip_in_allowed_list("203.0.113.220", ["203.0.113.220"]))
+        self.assertTrue(web.is_ip_in_allowed_list("203.0.113.220", ["203.0.113.x"]))
+        self.assertTrue(web.is_ip_in_allowed_list("203.0.113.220", ["203.0.113.*"]))
+        self.assertTrue(web.is_ip_in_allowed_list("203.0.113.220", ["203.0.113.0/24"]))
+        self.assertFalse(web.is_ip_in_allowed_list("203.0.114.220", ["203.0.113.x"]))
+
+    def test_check_access_control_accepts_whitelist_ip_segment(self):
+        config = self._base_config()
+        config["app"]["access_control"] = "whitelist"
+        config["app"]["allowed_ips"] = ["203.0.113.x"]
+
+        with patch.object(web, "load_config", return_value=config):
+            with web.app.test_request_context("/", environ_overrides={"REMOTE_ADDR": "203.0.113.220"}):
+                allowed, error = web.check_access_control()
+
+        self.assertTrue(allowed)
+        self.assertIsNone(error)
+
+    def test_resolve_session_tokens_file_follows_key_file_directory(self):
+        with tempfile.TemporaryDirectory(prefix="auto_pt_tokens_") as temp_dir, patch.dict(
+            os.environ,
+            {
+                "AUTO_PT_KEY_FILE": str(Path(temp_dir) / "data" / "auto_pt.key"),
+                "AUTO_PT_SESSION_TOKENS_FILE": "",
+            },
+            clear=False,
+        ):
+            resolved = web._resolve_session_tokens_file()
+
+        self.assertEqual(resolved, Path(temp_dir) / "data" / "session_tokens.json")
+
+    def test_resolve_history_file_follows_key_file_directory(self):
+        with tempfile.TemporaryDirectory(prefix="auto_pt_history_") as temp_dir, patch.dict(
+            os.environ,
+            {
+                "AUTO_PT_KEY_FILE": str(Path(temp_dir) / "data" / "auto_pt.key"),
+                "AUTO_PT_HISTORY_FILE": "",
+            },
+            clear=False,
+        ):
+            resolved = web._resolve_history_file()
+
+        self.assertEqual(resolved, Path(temp_dir) / "data" / "history.json")
 
     def test_first_time_setup_allows_config_but_blocks_sensitive_routes(self):
         with patch.object(web, "_is_first_time_setup", return_value=True), patch.object(
@@ -976,6 +1048,131 @@ class ConfigApiRegressionTests(unittest.TestCase):
             config = Config(str(config_path))
 
         self.assertEqual(config.qbittorrent.get("host"), "127.0.0.1:8080")
+
+    def test_resolve_log_file_uses_logging_config_without_env_override(self):
+        config = self._base_config()
+        config["logging"] = {"dir": "custom-logs", "file": "web-runtime.log"}
+
+        with patch.dict(
+            os.environ,
+            {"AUTO_PT_LOG_DIR": "", "AUTO_PT_LOG_FILE": ""},
+            clear=False,
+        ):
+            resolved = web._resolve_log_file(config)
+
+        self.assertEqual(resolved, web.BASE_DIR / "custom-logs" / "web-runtime.log")
+
+    def test_get_active_log_file_prefers_env_log_dir(self):
+        config = self._base_config()
+        config["logging"] = {"dir": "custom-logs", "file": "web-runtime.log"}
+
+        with tempfile.TemporaryDirectory(prefix="auto_pt_logs_") as temp_dir, patch.object(
+            web, "load_config", return_value=config
+        ), patch.dict(
+            os.environ,
+            {"AUTO_PT_LOG_DIR": temp_dir, "AUTO_PT_LOG_FILE": ""},
+            clear=False,
+        ):
+            resolved = web._get_active_log_file()
+
+        self.assertEqual(resolved, Path(temp_dir) / "web-runtime.log")
+
+    def test_ensure_recovery_code_does_not_emit_utcnow_deprecation_warning(self):
+        config = self._base_config(secret="")
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            code = web._ensure_recovery_code(config, force_new=True)
+
+        deprecation_messages = [
+            str(item.message)
+            for item in caught
+            if issubclass(item.category, DeprecationWarning)
+        ]
+
+        self.assertTrue(code)
+        self.assertTrue(config["app"]["recovery_code_created_at"].endswith("Z"))
+        self.assertFalse(any("utcnow" in message for message in deprecation_messages))
+
+
+class FrontendAuthFlowRegressionTests(unittest.TestCase):
+    def test_recovery_email_notice_keeps_forced_auth_prompt_active(self):
+        source = (
+            Path(__file__).resolve().parents[1] / "static" / "js" / "main.js"
+        ).read_text(encoding="utf-8")
+        start = source.index("async function openNotificationBackupPanel()")
+        end = source.index("async function submitRecoveryModal()", start)
+        segment = source[start:end]
+
+        self.assertNotIn("window.closeAuthTokenModal({ force: true });", segment)
+        self.assertIn("resumeForcedAuthTokenPrompt", segment)
+        self.assertIn("onCancel: resumeForcedAuthTokenPrompt", segment)
+
+    def test_auth_token_modal_can_be_reopened_from_global_scope(self):
+        source = (
+            Path(__file__).resolve().parents[1] / "static" / "js" / "api.js"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("window.openAuthTokenModal = openAuthTokenModal;", source)
+
+
+class FrontendLayoutRegressionTests(unittest.TestCase):
+    def test_history_card_layout_keeps_info_area_expandable(self):
+        source = (
+            Path(__file__).resolve().parents[1] / "static" / "css" / "ui-unify.css"
+        ).read_text(encoding="utf-8")
+        start = source.index(".history-item {")
+        end = source.index(".history-item:hover {", start)
+        segment = source[start:end]
+
+        self.assertIn("display: grid;", segment)
+        self.assertIn("grid-template-areas: \"check info action\";", segment)
+        self.assertIn("min-height: 116px;", segment)
+        self.assertIn("overflow: visible;", segment)
+
+
+class ReleaseToolingRegressionTests(unittest.TestCase):
+    def test_release_notes_use_current_changelog_section(self):
+        version = release_metadata.extract_app_version()
+        heading, bullet_lines = release_metadata.extract_changelog_section(version)
+
+        self.assertTrue(heading.startswith(f"## [{version}] - "))
+        self.assertGreaterEqual(len(bullet_lines), 1)
+        self.assertTrue(all(line.startswith("- ") for line in bullet_lines))
+        self.assertFalse(any("## [" in line for line in bullet_lines))
+
+    def test_release_notes_render_includes_release_artifacts_and_docker_tags(self):
+        version = release_metadata.extract_app_version()
+        _, bullet_lines = release_metadata.extract_changelog_section(version)
+        notes = release_metadata.build_release_notes(version)
+
+        self.assertIn(f"# PT Auto Downloader v{version}", notes)
+        self.assertIn("## 本次更新", notes)
+        self.assertIn("## 发布产物", notes)
+        for bullet_line in bullet_lines:
+            self.assertIn(bullet_line, notes)
+        self.assertIn("`pt-auto-downloader-release.zip`", notes)
+        self.assertIn(f"`futubu/pt-auto-downloader:{version}`", notes)
+        self.assertIn("`futubu/pt-auto-downloader:latest`", notes)
+
+    def test_release_workflow_uses_generated_changelog_body(self):
+        source = (
+            Path(__file__).resolve().parents[1] / ".github" / "workflows" / "release-package.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("body_path:", source)
+        self.assertIn("make_latest: true", source)
+        self.assertNotIn("generate_release_notes: true", source)
+
+    def test_docker_publish_workflow_pushes_version_and_latest_tags(self):
+        source = (
+            Path(__file__).resolve().parents[1] / ".github" / "workflows" / "docker-publish.yml"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn('docker push "$IMAGE_NAME:$VERSION"', source)
+        self.assertIn('docker push "$IMAGE_NAME:latest"', source)
+        self.assertIn('docker build \\', source)
+        self.assertIn('python tools/export_release.py --target "$RELEASE_DIR"', source)
 
 
 class QBittorrentClientRegressionTests(unittest.TestCase):

@@ -25,10 +25,45 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Show tool versions
+        run: |
+          python --version
+          node --version
+
+      - name: Run checks
+        run: python tools/run_checks.py
+
+      - name: Verify release metadata and generate release notes
+        env:
+          GIT_REF_NAME: ${{ github.ref_name }}
+          GIT_REF_TYPE: ${{ github.ref_type }}
+          RELEASE_NOTES_FILE: ${{ runner.temp }}/release-notes.md
+        run: |
+          if [ "$GIT_REF_TYPE" = "tag" ]; then
+            python tools/check_release_metadata.py --tag "$GIT_REF_NAME" --write-release-notes "$RELEASE_NOTES_FILE"
+          else
+            python tools/check_release_metadata.py --write-release-notes "$RELEASE_NOTES_FILE"
+          fi
+
       - name: Export clean release directory
         env:
           RELEASE_DIR: ${{ runner.temp }}/pt-auto-release
         run: python tools/export_release.py --target "$RELEASE_DIR"
+
+      - name: Verify exported release directory
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/pt-auto-release
+        run: python tools/export_release.py --verify-only --target "$RELEASE_DIR"
 
       - name: Archive release package
         env:
@@ -56,5 +91,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          name: ${{ github.ref_name }}
           files: ${{ runner.temp }}/pt-auto-downloader-release.zip
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/release-notes.md
+          fail_on_unmatched_files: true
+          make_latest: true

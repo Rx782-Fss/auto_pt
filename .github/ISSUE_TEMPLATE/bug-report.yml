@@ -40,7 +40,7 @@ body:
       label: 环境信息
       description: 请填写版本、部署方式、操作系统、浏览器等。
       placeholder: |
-        版本：v1.2.0
+        版本：v1.2.1
         部署方式：Docker
         操作系统：Ubuntu 22.04
         浏览器：Chrome 134

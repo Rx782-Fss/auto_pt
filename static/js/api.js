@@ -921,6 +921,7 @@ window.setAuthTokenPromptSuppressed = setAuthTokenPromptSuppressed;
 window.resolveAuthTokenPrompt = settleAuthTokenRequest;
 window.hideAuthTokenModal = hideAuthTokenModal;
 window.focusAuthTokenInput = focusAuthTokenInput;
+window.openAuthTokenModal = openAuthTokenModal;
 
 // 导出 API_CONFIG 到全局（重要！用于其他模块检查认证状态）
 window.apiConfig = API_CONFIG;

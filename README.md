@@ -90,7 +90,8 @@ app:
   access_control: lan
   allowed_ips: []
   secret: YOUR_SECRET_KEY_HERE_CHANGE_ME
-  version: 1.2.0
+  session_token_ttl_days: 30
+  version: 1.2.1
   web_port: 5000
 
 log_level: WARNING
@@ -149,6 +150,7 @@ pt_sites:
 - `download_settings.auto_download`：是否自动下载新种子
 - `download_settings.auto_delete`：是否自动清理该站点已完成种子
 - `download_settings.delete_files`：清理种子时是否同时删除文件
+- `app.session_token_ttl_days`：Web 登录会话有效期，默认 30 天；重启后会尽量从 `data/session_tokens.json` 恢复
 
 ### 邮件通知（可选）
 
@@ -164,12 +166,20 @@ pt_sites:
 ## 镜像标签
 
 - `latest`：滚动跟随最新发布版本，适合希望持续获取最新更新的部署
-- `1.2.0`：固定到当前发布版本，适合希望结果可复现的稳定部署
+- `1.2.1`：固定到当前发布版本，适合希望结果可复现的稳定部署
 
 ## 本地运行
 
 ```bash
-pip install -r requirements.txt
+# Windows
+py -3 -m venv .venv
+.venv\Scripts\activate
+python -m pip install -r requirements.txt
+
+# Linux
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
 复制并编辑配置：
@@ -193,11 +203,22 @@ chmod +x start.sh
 ./start.sh
 ```
 
+说明：
+
+- 启动脚本会优先使用仓库内的 `.venv`。
+- Linux 脚本会自动回退到系统 `python3`/`python`。
+- Windows 脚本会自动回退到 `py -3` 或 `python`。
+- 如果本地没有 `config.yaml`，启动脚本会自动从 `config.yaml.example` 生成一份默认配置。
+
 ## 开发与检查
 
 开发启动：
 
 ```bash
+# 先激活虚拟环境
+# Windows: .venv\Scripts\activate
+# Linux: source .venv/bin/activate
+
 python main.py -d
 python web.py
 ```
@@ -218,6 +239,38 @@ chmod +x check.sh
 - Python 语法检查
 - 前端 JavaScript 语法检查
 - `tests/` 下的回归测试
+- 发布元数据一致性检查（版本号、主页副标题、Docker 标签等）
+
+## 发布流程
+
+发布操作统一在源码仓库根目录执行，不在导出的 `发布/` 目录里提交代码或打 Git 标签。
+
+发布前建议按下面顺序执行：
+
+```bash
+# 1. 在源码仓库根目录完成检查
+./check.sh
+
+# 2. 导出干净发布目录，做最终验收
+./export-release.sh --target ../发布
+
+# 3. 提交并推送源码
+git add .
+git commit -m "release: v<version>"
+git push origin main
+
+# 4. 打版本标签并推送
+git tag v<version>
+git push origin v<version>
+```
+
+发布规则：
+
+- Git 标签必须与 `config.yaml.example` 中的 `app.version` 一致。
+- GitHub Release 页面正文直接从 `CHANGELOG.md` 当前版本条目生成，不再依赖自动生成的 release notes。
+- GitHub Actions 会先执行完整检查、版本校验和发布目录白名单校验，再上传 Release 附件。
+- Docker 发布会从干净发布目录构建镜像，并同时推送 `futubu/pt-auto-downloader:<version>` 和 `futubu/pt-auto-downloader:latest`。
+- 导出的 `发布/` 目录只用于最终验收和对外分发，不包含 `config.yaml`、`auto_pt.key`、`data/`、`logs/`、`.github/`、`AGENTS.md` 等本地或维护信息。
 
 ## 常见问题
 

@@ -706,6 +706,22 @@ function openRecoveryModal() {
     return true;
 }
 
+function resumeForcedAuthTokenPrompt() {
+    requestAnimationFrame(() => {
+        const authModal = document.getElementById('authTokenModal');
+        if (authModal?.classList.contains('show')) {
+            if (typeof window.focusAuthTokenInput === 'function') {
+                window.focusAuthTokenInput();
+            }
+            return;
+        }
+
+        if (typeof window.openAuthTokenModal === 'function') {
+            window.openAuthTokenModal();
+        }
+    });
+}
+
 async function openNotificationBackupPanel() {
     try {
         const result = await apiPost('/api/auth/recovery-email', {}, {
@@ -716,31 +732,21 @@ async function openNotificationBackupPanel() {
             throw new Error(result?.error || result?.message || '发送失败');
         }
 
-        if (typeof window.closeAuthTokenModal === 'function') {
-            window.closeAuthTokenModal({ force: true });
-        }
         showConfirmModal(
             '邮箱恢复已发送',
             result?.message || '已向邮箱发送验证信息，请到邮箱接收。',
             '',
-            null,
+            resumeForcedAuthTokenPrompt,
             {
                 confirmText: '知道了',
                 cancelText: '关闭',
+                onCancel: resumeForcedAuthTokenPrompt,
             }
         );
         return true;
     } catch (error) {
         const message = error?.message || '发送失败';
         const noEmailConfigured = message.includes('没有设置邮箱信息');
-        const refocusAuthInput = () => {
-            requestAnimationFrame(() => {
-                const authModal = document.getElementById('authTokenModal');
-                if (authModal?.classList.contains('show') && typeof window.focusAuthTokenInput === 'function') {
-                    window.focusAuthTokenInput();
-                }
-            });
-        };
         if (!noEmailConfigured) {
             console.error('[main.js] 邮箱恢复失败:', error);
         }
@@ -750,11 +756,11 @@ async function openNotificationBackupPanel() {
                 ? '没有设置邮箱信息，请改用恢复码恢复。'
                 : `邮箱恢复失败：${message}`,
             '',
-            noEmailConfigured ? refocusAuthInput : null,
+            resumeForcedAuthTokenPrompt,
             {
                 confirmText: '知道了',
                 cancelText: noEmailConfigured ? '返回' : '关闭',
-                onCancel: noEmailConfigured ? refocusAuthInput : null,
+                onCancel: resumeForcedAuthTokenPrompt,
             }
         );
         return false;

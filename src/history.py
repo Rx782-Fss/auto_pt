@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 from typing import Set
 from datetime import datetime, timezone
 
@@ -8,7 +9,32 @@ from .log_constants import LOG_HISTORY
 
 logger = get_logger(__name__)
 
-HISTORY_FILE = "data/history.json"
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def _resolve_runtime_data_dir() -> Path:
+    """解析运行时数据目录，优先跟随密钥文件目录。"""
+    env_key_file = os.getenv("AUTO_PT_KEY_FILE", "").strip()
+    if env_key_file:
+        key_path = Path(env_key_file).expanduser()
+        if not key_path.is_absolute():
+            key_path = (BASE_DIR / key_path).resolve()
+        return key_path.parent
+    return BASE_DIR / "data"
+
+
+def _resolve_history_file() -> str:
+    """解析历史记录文件路径，优先使用运行时目录。"""
+    env_history_file = os.getenv("AUTO_PT_HISTORY_FILE", "").strip()
+    if env_history_file:
+        history_path = Path(env_history_file).expanduser()
+        if not history_path.is_absolute():
+            history_path = (BASE_DIR / history_path).resolve()
+        return str(history_path)
+    return str(_resolve_runtime_data_dir() / "history.json")
+
+
+HISTORY_FILE = _resolve_history_file()
 
 _HISTORY_STATUS_ALIASES = {
     "pausedup": "completed",
